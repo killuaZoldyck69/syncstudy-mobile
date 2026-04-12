@@ -265,23 +265,15 @@ export default function RegisterScreen() {
               color={theme.colors.textSecondary}
               style={{ marginRight: 8 }}
             />
-            <View style={styles.searchWrapper}>
-              <Ionicons
-                name="search"
-                size={20}
-                color={theme.colors.textSecondary}
-                style={{ marginRight: 8 }}
-              />
-              {/* Swap to the standard React Native TextInput */}
-              <TextInput
-                style={styles.searchInput}
-                placeholder="Search universities..."
-                placeholderTextColor={theme.colors.textSecondary}
-                value={searchQuery}
-                onChangeText={setSearchQuery}
-                autoCapitalize="words"
-              />
-            </View>
+            {/* Swap to the standard React Native TextInput */}
+            <TextInput
+              style={styles.searchInput}
+              placeholder="Search universities..."
+              placeholderTextColor={theme.colors.textSecondary}
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              autoCapitalize="words"
+            />
           </View>
         </View>
 

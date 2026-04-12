@@ -614,13 +614,6 @@ export const bdUniversities =
       department: "dental",
     },
     {
-      name: "Dhaka Dental College, Mirpur-14, Dhaka",
-      shortName: "DDC",
-      institutionType: "university",
-      category: "public",
-      department: "dental",
-    },
-    {
       name: "Chittagong Medical College Dental Unit, Chittagong",
       shortName: "CMCDU",
       institutionType: "university",
@@ -1565,13 +1558,6 @@ export const bdUniversities =
     {
       name: "BGC Trust Medical College, Chittagong",
       shortName: "BGCTMC",
-      institutionType: "university",
-      category: "private",
-      department: "medical",
-    },
-    {
-      name: "Shaheed Suhrawardy Medical College, Dhaka",
-      shortName: "SSMC",
       institutionType: "university",
       category: "private",
       department: "medical",

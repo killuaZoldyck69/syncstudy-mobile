@@ -1,9 +1,12 @@
 import { theme } from "@/constants/theme";
+import { apiClient } from "@/src/api/client";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import React, { useState } from "react";
 import {
+  ActivityIndicator,
+  Alert,
   KeyboardAvoidingView,
   Platform,
   StatusBar as RNStatusBar,
@@ -21,10 +24,36 @@ export default function LoginScreen() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
-  const handleLogin = () => {
-    console.log("[Auth] Attempting Login with:", email);
-    // TODO: Wire up BetterAuth POST /api/auth/sign-in/email here
+  const handleLogin = async () => {
+    if (!email || !password) {
+      Alert.alert("Error", "Please fill in all fields.");
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      console.log("[Auth] Attempting Login with:", email);
+
+      // Call your BetterAuth endpoint
+      const response = await apiClient("/auth/sign-in/email", {
+        data: {
+          email,
+          password,
+        },
+      });
+
+      console.log("[Auth] Login Success:", response);
+      // TODO: Save the session token to AsyncStorage here later
+
+      Alert.alert("Success", "Welcome back to your workspace!");
+      // router.push('/(tabs)/dashboard'); // Navigate to main app
+    } catch (error: any) {
+      Alert.alert("Login Failed", error.message);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -118,20 +147,27 @@ export default function LoginScreen() {
               activeOpacity={0.8}
               onPress={handleLogin}
               style={styles.buttonMargin}
+              disabled={isLoading} // Prevent double-clicks
             >
               <LinearGradient
                 colors={[theme.colors.primary, theme.colors.primaryGradientEnd]}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 0 }}
-                style={styles.primaryButton}
+                style={[styles.primaryButton, isLoading && { opacity: 0.7 }]}
               >
-                <Text style={styles.primaryButtonText}>Log In</Text>
-                <Ionicons
-                  name="arrow-forward"
-                  size={20}
-                  color={theme.colors.textPrimary}
-                  style={{ marginLeft: 8 }}
-                />
+                {isLoading ? (
+                  <ActivityIndicator color={theme.colors.textPrimary} />
+                ) : (
+                  <>
+                    <Text style={styles.primaryButtonText}>Log In</Text>
+                    <Ionicons
+                      name="arrow-forward"
+                      size={20}
+                      color={theme.colors.textPrimary}
+                      style={{ marginLeft: 8 }}
+                    />
+                  </>
+                )}
               </LinearGradient>
             </TouchableOpacity>
           </View>

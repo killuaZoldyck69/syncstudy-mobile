@@ -1,5 +1,6 @@
 import { theme } from "@/constants/theme";
 import { bdUniversities } from "@/constants/universities";
+import { apiClient } from "@/src/api/client";
 import { Ionicons } from "@expo/vector-icons";
 import {
   BottomSheetBackdrop,
@@ -10,6 +11,8 @@ import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import React, { useMemo, useRef, useState } from "react";
 import {
+  ActivityIndicator,
+  Alert,
   Keyboard,
   KeyboardAvoidingView,
   Platform,
@@ -36,6 +39,7 @@ export default function RegisterScreen() {
   const [department, setDepartment] = useState("");
   const [studentId, setStudentId] = useState("");
   const [avatarUrl, setAvatarUrl] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
 
   // Bottom Sheet & Search State
   const bottomSheetModalRef = useRef<BottomSheetModal>(null);
@@ -60,8 +64,39 @@ export default function RegisterScreen() {
     bottomSheetModalRef.current?.dismiss();
   };
 
-  const handleRegister = () => {
-    console.log("[Auth] Attempting Registration for:", name, email, university);
+  const handleRegister = async () => {
+    if (!name || !email || !password || !university) {
+      Alert.alert("Error", "Please fill in all required fields.");
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      console.log("[Auth] Attempting Registration...");
+
+      // Call your BetterAuth endpoint matching your Prisma User schema
+      const response = await apiClient("/auth/sign-up/email", {
+        data: {
+          email,
+          password,
+          name,
+          // Passing the extra meta-data we collected
+          university,
+          department,
+          studentId,
+          image: avatarUrl,
+        },
+      });
+
+      console.log("[Auth] Registration Success:", response);
+      Alert.alert("Success", "Identity created! Please log in.");
+
+      router.push("/(auth)/login"); // Send them to login
+    } catch (error: any) {
+      Alert.alert("Registration Failed", error.message);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -160,9 +195,15 @@ export default function RegisterScreen() {
                 style={styles.inputWrapper}
                 onPress={openUniversityModal}
               >
+                {/* Replaced styles.input with explicit rules minus the height */}
                 <Text
                   style={[
-                    styles.input,
+                    {
+                      flex: 1,
+                      fontFamily: theme.typography.body,
+                      fontSize: 16,
+                      color: theme.colors.textPrimary,
+                    },
                     !university && { color: theme.colors.textSecondary },
                   ]}
                   numberOfLines={1}
@@ -208,25 +249,57 @@ export default function RegisterScreen() {
               </View>
             </View>
 
+            {/* Profile Picture URL */}
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>
+                PROFILE PICTURE URL{" "}
+                <Text style={styles.optionalText}>(optional)</Text>
+              </Text>
+              <View style={styles.inputWrapper}>
+                <TextInput
+                  style={styles.input}
+                  placeholder="https://example.com/photo.jpg"
+                  placeholderTextColor={theme.colors.textSecondary}
+                  keyboardType="url"
+                  autoCapitalize="none"
+                  value={avatarUrl}
+                  onChangeText={setAvatarUrl}
+                />
+                <Ionicons
+                  name="image"
+                  size={18}
+                  color={theme.colors.textSecondary}
+                  style={styles.inputIcon}
+                />
+              </View>
+            </View>
+
             {/* Submit Button */}
             <TouchableOpacity
               activeOpacity={0.8}
               onPress={handleRegister}
               style={styles.buttonMargin}
+              disabled={isLoading}
             >
               <LinearGradient
                 colors={[theme.colors.primary, theme.colors.primaryGradientEnd]}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 0 }}
-                style={styles.primaryButton}
+                style={[styles.primaryButton, isLoading && { opacity: 0.7 }]}
               >
-                <Text style={styles.primaryButtonText}>Create Account</Text>
-                <Ionicons
-                  name="arrow-forward"
-                  size={20}
-                  color={theme.colors.textPrimary}
-                  style={{ marginLeft: 8 }}
-                />
+                {isLoading ? (
+                  <ActivityIndicator color={theme.colors.textPrimary} />
+                ) : (
+                  <>
+                    <Text style={styles.primaryButtonText}>Create Account</Text>
+                    <Ionicons
+                      name="arrow-forward"
+                      size={20}
+                      color={theme.colors.textPrimary}
+                      style={{ marginLeft: 8 }}
+                    />
+                  </>
+                )}
               </LinearGradient>
             </TouchableOpacity>
           </View>

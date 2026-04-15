@@ -1,6 +1,6 @@
 import { theme } from "@/constants/theme";
 import { bdUniversities } from "@/constants/universities";
-import { apiClient } from "@/src/api/client";
+import { authClient } from "@/src/lib/auth-client";
 import { Ionicons } from "@expo/vector-icons";
 import {
   BottomSheetBackdrop,
@@ -74,31 +74,34 @@ export default function RegisterScreen() {
     try {
       console.log("[Auth] Attempting Registration...");
 
-      // Call your BetterAuth endpoint matching your Prisma User schema
-      const response = await apiClient("/auth/sign-up/email", {
-        data: {
-          email,
-          password,
-          name,
-          // Passing the extra meta-data we collected
-          university,
-          department,
-          studentId,
-          image: avatarUrl,
-        },
-      });
+      // Use "as any" to bypass strict frontend types for our custom backend fields
+      const { data, error } = await authClient.signUp.email({
+        email,
+        password,
+        name,
+        image: avatarUrl,
+        university_name: university,
+        department: department,
+        student_id: studentId,
+      } as any);
 
-      console.log("[Auth] Registration Success:", response);
-      Alert.alert("Success", "Identity created! Please log in.");
+      if (error) {
+        Alert.alert("Registration Failed", error.message);
+        setIsLoading(false);
+        return;
+      }
 
-      router.push("/(auth)/login"); // Send them to login
+      console.log("[Auth] Registration Success:", data);
+      Alert.alert("Success", "Identity created! Welcome to SyncStudy.");
+
+      // Since authClient logs them in automatically after sign-up, go straight to the profile!
+      router.replace("/(tabs)/profile");
     } catch (error: any) {
-      Alert.alert("Registration Failed", error.message);
+      Alert.alert("Registration Error", error.message);
     } finally {
       setIsLoading(false);
     }
   };
-
   return (
     <SafeAreaView style={styles.safeArea}>
       <KeyboardAvoidingView

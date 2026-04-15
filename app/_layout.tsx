@@ -37,6 +37,7 @@ export default function RootLayout() {
         <StatusBar style="light" backgroundColor="#0e0e0e" />
         <Stack screenOptions={{ headerShown: false, animation: "fade" }}>
           <Stack.Screen name="(auth)" />
+          <Stack.Screen name="(tabs)" />
         </Stack>
       </BottomSheetModalProvider>
     </GestureHandlerRootView>

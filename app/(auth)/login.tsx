@@ -48,7 +48,7 @@ export default function LoginScreen() {
       // TODO: Save the session token to AsyncStorage here later
 
       Alert.alert("Success", "Welcome back to your workspace!");
-      // router.push('/(tabs)/dashboard'); // Navigate to main app
+      router.push("/(tabs)/profile"); // Navigate to main app
     } catch (error: any) {
       Alert.alert("Login Failed", error.message);
     } finally {

@@ -13,6 +13,7 @@ export const apiClient = async <T>(
   const config: RequestInit = {
     method: data ? "POST" : "GET",
     body: data ? JSON.stringify(data) : undefined,
+    credentials: "include",
     headers: {
       "Content-Type": "application/json",
       Accept: "application/json",

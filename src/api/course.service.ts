@@ -20,11 +20,15 @@ export interface CourseAPIResponse {
 }
 
 export interface CreateCoursePayload {
-  code: string;
+  course_code: string;
+  course_name: string;
   department: string;
-  name: string;
   section: string;
-  term: string;
+  term_offered: string;
+  instructor_name: string;
+  university_name: string;
+  midterm_week_start?: string | null;
+  final_week_start?: string | null;
 }
 
 export const courseService = {

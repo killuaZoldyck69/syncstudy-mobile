@@ -187,4 +187,22 @@ export const courseService = {
       };
     }
   },
+
+  /**
+   * Deletes a course hub (Admin only).
+   */
+  deleteCourse: async (courseId: string) => {
+    try {
+      const response = await apiClient<any>(`/courses/${courseId}`, {
+        method: "DELETE",
+      });
+      return { data: response, error: null };
+    } catch (error: any) {
+      console.error("[CourseService] Delete Course Error:", error);
+      return {
+        data: null,
+        error: { message: error.message || "Failed to delete hub." },
+      };
+    }
+  },
 };

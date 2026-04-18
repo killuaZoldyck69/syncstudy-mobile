@@ -79,6 +79,37 @@ export default function CourseDetailsScreen() {
     router.push(`/course/edit/${id}` as any);
   };
 
+  const handleDeletePress = () => {
+    setIsMenuOpen(false); // Close the dropdown menu first
+
+    // Trigger a native confirmation alert
+    Alert.alert(
+      "Delete Workspace",
+      "Are you sure you want to permanently delete this hub? This action cannot be undone.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive", // This makes the button natively red on iOS!
+          onPress: async () => {
+            setIsLoading(true); // Show the loading spinner
+
+            const { error } = await courseService.deleteCourse(id as string);
+
+            if (error) {
+              Alert.alert("Delete Failed", error.message);
+              setIsLoading(false);
+            } else {
+              Alert.alert("Success", "Workspace deleted successfully.");
+              // Route them back to the home screen after deletion
+              router.replace("/");
+            }
+          },
+        },
+      ],
+    );
+  };
+
   return (
     <SafeAreaView style={styles.safeArea}>
       {/* HEADER */}
@@ -321,7 +352,7 @@ export default function CourseDetailsScreen() {
 
                 <TouchableOpacity
                   style={styles.dropdownItem}
-                  onPress={() => setIsMenuOpen(false)}
+                  onPress={handleDeletePress}
                 >
                   <Ionicons name="trash" size={18} color="#ef4444" />
                   <Text style={[styles.dropdownItemText, { color: "#ef4444" }]}>

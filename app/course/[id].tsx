@@ -1,12 +1,13 @@
 // app/course/[id].tsx
 import { Ionicons } from "@expo/vector-icons";
-import { LinearGradient } from "expo-linear-gradient";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Modal,
   Platform,
+  Pressable,
   StatusBar as RNStatusBar,
   SafeAreaView,
   ScrollView,
@@ -28,6 +29,9 @@ export default function CourseDetailsScreen() {
   const [activeTab, setActiveTab] = useState<"MID-TERM" | "FINAL-TERM">(
     "MID-TERM",
   );
+
+  // Dropdown Menu State
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   useEffect(() => {
     if (id) fetchDetails(id as string);
@@ -64,11 +68,15 @@ export default function CourseDetailsScreen() {
   const canEdit =
     user_context.role === "ADMIN" || user_context.role === "MODERATOR";
 
-  // Helper to format dates like "Oct 20"
   const formatDate = (isoString: string | null) => {
     if (!isoString) return "TBA";
     const date = new Date(isoString);
     return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  };
+
+  const handleEditPress = () => {
+    setIsMenuOpen(false);
+    router.push(`/course/edit/${id}` as any);
   };
 
   return (
@@ -94,34 +102,16 @@ export default function CourseDetailsScreen() {
           </View>
         </View>
 
+        {/* Header Right - Ellipsis Icon */}
         <View style={styles.headerRight}>
-          <TouchableOpacity style={styles.iconButton}>
-            <Ionicons
-              name="people"
-              size={22}
-              color={theme.colors.textSecondary}
-            />
-          </TouchableOpacity>
-
-          {/* Conditionally render ADD LECTURE button based on RBAC */}
-          {canEdit && (
-            <TouchableOpacity activeOpacity={0.8}>
-              <LinearGradient
-                colors={[theme.colors.primary, theme.colors.primaryGradientEnd]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={styles.addLectureBtn}
-              >
-                <Text style={styles.addLectureText}>+ ADD LECTURE</Text>
-              </LinearGradient>
-            </TouchableOpacity>
-          )}
-
-          <TouchableOpacity style={styles.iconButton}>
+          <TouchableOpacity
+            onPress={() => setIsMenuOpen(true)}
+            style={styles.iconButton}
+          >
             <Ionicons
               name="ellipsis-vertical"
-              size={22}
-              color={theme.colors.textSecondary}
+              size={24}
+              color={theme.colors.textPrimary}
             />
           </TouchableOpacity>
         </View>
@@ -203,7 +193,6 @@ export default function CourseDetailsScreen() {
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={{ gap: 12 }}
           >
-            {/* Map over assessments here when they exist in the backend */}
             <Text style={{ color: "#fff" }}>Assessments will appear here</Text>
           </ScrollView>
         )}
@@ -250,12 +239,100 @@ export default function CourseDetailsScreen() {
                 <Text style={styles.topicTitle}>
                   {index + 1}. {topic.title}
                 </Text>
-                {/* Standard Accordion UI implementation goes here */}
               </View>
             ))
           )}
         </View>
       </ScrollView>
+
+      {/* --- DROPDOWN MENU OVERLAY --- */}
+      <Modal visible={isMenuOpen} transparent={true} animationType="fade">
+        {/* Pressable overlay catches taps outside the menu to close it */}
+        <Pressable
+          style={styles.modalOverlay}
+          onPress={() => setIsMenuOpen(false)}
+        >
+          <View style={styles.dropdownMenu}>
+            <TouchableOpacity
+              style={styles.dropdownItem}
+              onPress={() => setIsMenuOpen(false)}
+            >
+              <Ionicons
+                name="people"
+                size={18}
+                color={theme.colors.textPrimary}
+              />
+              <Text style={styles.dropdownItemText}>Members</Text>
+            </TouchableOpacity>
+
+            {canEdit && (
+              <>
+                <TouchableOpacity
+                  style={styles.dropdownItem}
+                  onPress={() => setIsMenuOpen(false)}
+                >
+                  <Ionicons
+                    name="add-circle"
+                    size={18}
+                    color={theme.colors.primary}
+                  />
+                  <Text
+                    style={[
+                      styles.dropdownItemText,
+                      { color: theme.colors.primary },
+                    ]}
+                  >
+                    Add Lecture
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.dropdownItem}
+                  onPress={handleEditPress}
+                >
+                  <Ionicons
+                    name="pencil"
+                    size={18}
+                    color={theme.colors.textPrimary}
+                  />
+                  <Text style={styles.dropdownItemText}>Edit Hub Details</Text>
+                </TouchableOpacity>
+
+                <View style={styles.menuDivider} />
+
+                <TouchableOpacity
+                  style={styles.dropdownItem}
+                  onPress={() => setIsMenuOpen(false)}
+                >
+                  <Ionicons
+                    name="archive"
+                    size={18}
+                    color={theme.colors.textSecondary}
+                  />
+                  <Text
+                    style={[
+                      styles.dropdownItemText,
+                      { color: theme.colors.textSecondary },
+                    ]}
+                  >
+                    Archive Hub
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.dropdownItem}
+                  onPress={() => setIsMenuOpen(false)}
+                >
+                  <Ionicons name="trash" size={18} color="#ef4444" />
+                  <Text style={[styles.dropdownItemText, { color: "#ef4444" }]}>
+                    Delete Hub
+                  </Text>
+                </TouchableOpacity>
+              </>
+            )}
+          </View>
+        </Pressable>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -289,17 +366,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: theme.colors.textSecondary,
   },
-  headerRight: { flexDirection: "row", alignItems: "center", gap: 4 },
-  addLectureBtn: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: theme.shapes.radius.pill,
-  },
-  addLectureText: {
-    fontFamily: theme.typography.bodyBold,
-    fontSize: 11,
-    color: theme.colors.textPrimary,
-  },
+  headerRight: { flexDirection: "row", alignItems: "center" },
 
   scrollContent: { paddingHorizontal: theme.spacing.lg, paddingBottom: 40 },
 
@@ -316,7 +383,7 @@ const styles = StyleSheet.create({
   tagText: {
     fontFamily: theme.typography.bodyMedium,
     fontSize: 12,
-    color: theme.colors.primary,
+    color: theme.colors.textSecondary,
   },
 
   /* Progress Cards */
@@ -440,5 +507,44 @@ const styles = StyleSheet.create({
     fontFamily: theme.typography.bodyBold,
     fontSize: 16,
     color: theme.colors.textPrimary,
+  },
+
+  /* --- Dropdown Menu Styles --- */
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "transparent",
+  },
+  dropdownMenu: {
+    position: "absolute",
+    top: Platform.OS === "ios" ? 100 : 70, // Adjusts slightly below the header
+    right: 16,
+    width: 220,
+    backgroundColor: "#1a1a1c",
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#2a2a2a",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 10,
+    paddingVertical: 8,
+  },
+  dropdownItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    gap: 12,
+  },
+  dropdownItemText: {
+    fontFamily: theme.typography.bodyMedium,
+    fontSize: 15,
+    color: theme.colors.textPrimary,
+  },
+  menuDivider: {
+    height: 1,
+    backgroundColor: "#2a2a2a",
+    marginVertical: 4,
   },
 });

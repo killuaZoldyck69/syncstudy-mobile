@@ -52,6 +52,8 @@ export interface CourseDetails {
     id: string;
     course_code: string;
     course_name: string;
+    university_name: string;
+    department: string;
     section: string;
     instructor_name: string;
     term_offered: string;
@@ -80,6 +82,17 @@ export interface CourseDetailsAPIResponse {
   success: boolean;
   message: string;
   data: CourseDetails;
+}
+
+export interface UpdateCoursePayload {
+  course_code?: string;
+  course_name?: string;
+  department?: string;
+  section?: string;
+  term_offered?: string;
+  instructor_name?: string;
+  midterm_week_start?: string | null;
+  final_week_start?: string | null;
 }
 
 export const courseService = {
@@ -152,6 +165,25 @@ export const courseService = {
       return {
         data: null,
         error: { message: error.message || "Failed to load course details." },
+      };
+    }
+  },
+
+  /**
+   * Updates an existing course hub.
+   */
+  updateCourse: async (courseId: string, payload: UpdateCoursePayload) => {
+    try {
+      const response = await apiClient<any>(`/courses/${courseId}`, {
+        method: "PUT",
+        data: payload,
+      });
+      return { data: response, error: null };
+    } catch (error: any) {
+      console.error("[CourseService] Update Course Error:", error);
+      return {
+        data: null,
+        error: { message: error.message || "Failed to update hub." },
       };
     }
   },

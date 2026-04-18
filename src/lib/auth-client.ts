@@ -10,12 +10,17 @@ const SERVER_URL =
 export const authClient = createAuthClient({
   baseURL: SERVER_URL,
 
-  // 1. ADD THIS: Force the browser to send cookies cross-origin
   fetchOptions: {
     credentials: "include",
+    // ADD THIS: Manually inject the Origin header for mobile devices
+    headers:
+      Platform.OS !== "web"
+        ? {
+            Origin: SERVER_URL,
+          }
+        : undefined,
   },
 
-  // 2. Keep the platform check so mobile devices use the secure vault
   plugins:
     Platform.OS !== "web"
       ? [

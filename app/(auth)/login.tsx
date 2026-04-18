@@ -1,5 +1,5 @@
 import { theme } from "@/constants/theme";
-import { apiClient } from "@/src/api/client";
+import { authClient } from "@/src/lib/auth-client";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
@@ -36,19 +36,19 @@ export default function LoginScreen() {
     try {
       console.log("[Auth] Attempting Login with:", email);
 
-      // Call your BetterAuth endpoint
-      const response = await apiClient("/auth/sign-in/email", {
-        data: {
-          email,
-          password,
-        },
+      const { data, error } = await authClient.signIn.email({
+        email,
+        password,
       });
 
-      console.log("[Auth] Login Success:", response);
-      // TODO: Save the session token to AsyncStorage here later
+      if (error) {
+        Alert.alert("Login Failed", error.message || "Invalid credentials.");
+        return;
+      }
 
-      Alert.alert("Success", "Welcome back to your workspace!");
-      router.push("/(tabs)/profile"); // Navigate to main app
+      console.log("[Auth] Login Success:", data);
+      // No manual token saving needed — @better-auth/expo handles SecureStore automatically
+      router.replace("/(tabs)/profile");
     } catch (error: any) {
       Alert.alert("Login Failed", error.message);
     } finally {

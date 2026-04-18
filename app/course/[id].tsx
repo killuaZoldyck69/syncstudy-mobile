@@ -74,15 +74,15 @@ export default function CourseDetailsScreen() {
     return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
   };
 
+  // --- ACTION HANDLERS ---
+
   const handleEditPress = () => {
     setIsMenuOpen(false);
     router.push(`/course/edit/${id}` as any);
   };
 
   const handleDeletePress = () => {
-    setIsMenuOpen(false); // Close the dropdown menu first
-
-    // Trigger a native confirmation alert
+    setIsMenuOpen(false);
     Alert.alert(
       "Delete Workspace",
       "Are you sure you want to permanently delete this hub? This action cannot be undone.",
@@ -90,18 +90,15 @@ export default function CourseDetailsScreen() {
         { text: "Cancel", style: "cancel" },
         {
           text: "Delete",
-          style: "destructive", // This makes the button natively red on iOS!
+          style: "destructive",
           onPress: async () => {
-            setIsLoading(true); // Show the loading spinner
-
+            setIsLoading(true);
             const { error } = await courseService.deleteCourse(id as string);
-
             if (error) {
               Alert.alert("Delete Failed", error.message);
               setIsLoading(false);
             } else {
               Alert.alert("Success", "Workspace deleted successfully.");
-              // Route them back to the home screen after deletion
               router.replace("/");
             }
           },
@@ -111,8 +108,7 @@ export default function CourseDetailsScreen() {
   };
 
   const handleLeavePress = () => {
-    setIsMenuOpen(false); // Close the menu first
-
+    setIsMenuOpen(false);
     Alert.alert(
       "Leave Workspace",
       "Are you sure you want to leave this hub? Your progress will be wiped.",
@@ -120,18 +116,16 @@ export default function CourseDetailsScreen() {
         { text: "Cancel", style: "cancel" },
         {
           text: "Leave",
-          style: "destructive", // Native red text on iOS
+          style: "destructive",
           onPress: async () => {
             setIsLoading(true);
-
             const { error } = await courseService.leaveCourse(id as string);
-
             if (error) {
               Alert.alert("Leave Failed", error.message);
               setIsLoading(false);
             } else {
               Alert.alert("Success", "You have left the workspace.");
-              router.replace("/"); // Send them back to home screen
+              router.replace("/");
             }
           },
         },
@@ -307,24 +301,32 @@ export default function CourseDetailsScreen() {
 
       {/* --- DROPDOWN MENU OVERLAY --- */}
       <Modal visible={isMenuOpen} transparent={true} animationType="fade">
-        {/* Pressable overlay catches taps outside the menu to close it */}
         <Pressable
           style={styles.modalOverlay}
           onPress={() => setIsMenuOpen(false)}
         >
           <View style={styles.dropdownMenu}>
+            {/* VISIBLE TO EVERYONE */}
             <TouchableOpacity
               style={styles.dropdownItem}
-              onPress={() => setIsMenuOpen(false)}
+              onPress={() => {
+                setIsMenuOpen(false);
+                router.push(
+                  `/course/members/${id}?role=${user_context.role}` as any,
+                );
+              }}
             >
               <Ionicons
                 name="people"
                 size={18}
                 color={theme.colors.textPrimary}
               />
-              <Text style={styles.dropdownItemText}>Members</Text>
+              <Text style={styles.dropdownItemText}>
+                {canEdit ? "Manage Members" : "View Members"}
+              </Text>
             </TouchableOpacity>
 
+            {/* ADMIN / MODERATOR ACTIONS */}
             {canEdit && (
               <>
                 <TouchableOpacity
@@ -391,10 +393,10 @@ export default function CourseDetailsScreen() {
               </>
             )}
 
+            {/* STANDARD MEMBER ACTIONS */}
             {!canEdit && (
               <>
                 <View style={styles.menuDivider} />
-
                 <TouchableOpacity
                   style={styles.dropdownItem}
                   onPress={handleLeavePress}
@@ -420,7 +422,6 @@ const styles = StyleSheet.create({
     paddingTop: Platform.OS === "android" ? RNStatusBar.currentHeight : 0,
   },
 
-  /* Header */
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -446,7 +447,6 @@ const styles = StyleSheet.create({
 
   scrollContent: { paddingHorizontal: theme.spacing.lg, paddingBottom: 40 },
 
-  /* Tags */
   tagsRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 24 },
   tag: {
     backgroundColor: "#1a1a1c",
@@ -462,7 +462,6 @@ const styles = StyleSheet.create({
     color: theme.colors.textSecondary,
   },
 
-  /* Progress Cards */
   progressRow: { flexDirection: "row", gap: 16, marginBottom: 32 },
   progressCard: {
     flex: 1,
@@ -497,7 +496,6 @@ const styles = StyleSheet.create({
     color: theme.colors.textSecondary,
   },
 
-  /* Assessments */
   sectionHeaderRow: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -524,7 +522,6 @@ const styles = StyleSheet.create({
     color: theme.colors.primary,
   },
 
-  /* Empty State */
   emptyStateBox: {
     backgroundColor: "#161618",
     borderRadius: theme.shapes.radius.standard,
@@ -550,7 +547,6 @@ const styles = StyleSheet.create({
     color: theme.colors.textSecondary,
   },
 
-  /* Tabs */
   tabsContainer: {
     flexDirection: "row",
     borderBottomWidth: 1,
@@ -566,7 +562,6 @@ const styles = StyleSheet.create({
   },
   activeTabText: { color: theme.colors.primary },
 
-  /* Topics */
   topicsContainer: { gap: 16 },
   emptyTopicsText: {
     fontFamily: theme.typography.body,
@@ -586,13 +581,10 @@ const styles = StyleSheet.create({
   },
 
   /* --- Dropdown Menu Styles --- */
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: "transparent",
-  },
+  modalOverlay: { flex: 1, backgroundColor: "transparent" },
   dropdownMenu: {
     position: "absolute",
-    top: Platform.OS === "ios" ? 100 : 70, // Adjusts slightly below the header
+    top: Platform.OS === "ios" ? 100 : 70,
     right: 16,
     width: 220,
     backgroundColor: "#1a1a1c",
@@ -618,9 +610,5 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: theme.colors.textPrimary,
   },
-  menuDivider: {
-    height: 1,
-    backgroundColor: "#2a2a2a",
-    marginVertical: 4,
-  },
+  menuDivider: { height: 1, backgroundColor: "#2a2a2a", marginVertical: 4 },
 });

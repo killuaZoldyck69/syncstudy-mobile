@@ -95,6 +95,14 @@ export interface UpdateCoursePayload {
   final_week_start?: string | null;
 }
 
+export interface CourseMember {
+  user_id: string;
+  name: string;
+  email?: string;
+  image: string;
+  role: "ADMIN" | "MODERATOR" | "VIEWER" | "MEMBER";
+}
+
 export const courseService = {
   searchCourses: async (query: string = "") => {
     try {
@@ -219,6 +227,23 @@ export const courseService = {
       return {
         data: null,
         error: { message: error.message || "Failed to leave hub." },
+      };
+    }
+  },
+
+  /**
+   * Fetches detailed course roster (Admin / Mod only).
+   */
+  getCourseMembers: async (courseId: string) => {
+    try {
+      const response = await apiClient<any>(`/courses/${courseId}/members`);
+      // Assuming your backend returns { success: true, data: [...] }
+      return { data: response.data || response, error: null };
+    } catch (error: any) {
+      console.error("[CourseService] Get Members Error:", error);
+      return {
+        data: null,
+        error: { message: error.message || "Failed to load members." },
       };
     }
   },

@@ -142,7 +142,7 @@ export default function EditHubScreen() {
           <View style={styles.headerTextContainer}>
             <Text style={styles.headerTitle}>Edit Hub Details</Text>
           </View>
-          <View style={{ width: 28 }} />{" "}
+          <View style={{ width: 28 }} />
           {/* Spacer to perfectly center the title */}
         </View>
 

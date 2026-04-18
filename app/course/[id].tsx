@@ -110,6 +110,35 @@ export default function CourseDetailsScreen() {
     );
   };
 
+  const handleLeavePress = () => {
+    setIsMenuOpen(false); // Close the menu first
+
+    Alert.alert(
+      "Leave Workspace",
+      "Are you sure you want to leave this hub? Your progress will be wiped.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Leave",
+          style: "destructive", // Native red text on iOS
+          onPress: async () => {
+            setIsLoading(true);
+
+            const { error } = await courseService.leaveCourse(id as string);
+
+            if (error) {
+              Alert.alert("Leave Failed", error.message);
+              setIsLoading(false);
+            } else {
+              Alert.alert("Success", "You have left the workspace.");
+              router.replace("/"); // Send them back to home screen
+            }
+          },
+        },
+      ],
+    );
+  };
+
   return (
     <SafeAreaView style={styles.safeArea}>
       {/* HEADER */}
@@ -357,6 +386,22 @@ export default function CourseDetailsScreen() {
                   <Ionicons name="trash" size={18} color="#ef4444" />
                   <Text style={[styles.dropdownItemText, { color: "#ef4444" }]}>
                     Delete Hub
+                  </Text>
+                </TouchableOpacity>
+              </>
+            )}
+
+            {!canEdit && (
+              <>
+                <View style={styles.menuDivider} />
+
+                <TouchableOpacity
+                  style={styles.dropdownItem}
+                  onPress={handleLeavePress}
+                >
+                  <Ionicons name="exit-outline" size={18} color="#ef4444" />
+                  <Text style={[styles.dropdownItemText, { color: "#ef4444" }]}>
+                    Leave Hub
                   </Text>
                 </TouchableOpacity>
               </>

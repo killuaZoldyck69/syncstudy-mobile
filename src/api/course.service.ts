@@ -204,4 +204,22 @@ export const courseService = {
       };
     }
   },
+
+  /**
+   * Leaves a course hub & wipes progress (Course Member).
+   */
+  leaveCourse: async (courseId: string) => {
+    try {
+      const response = await apiClient<any>(`/courses/${courseId}/leave`, {
+        method: "DELETE",
+      });
+      return { data: response, error: null };
+    } catch (error: any) {
+      console.error("[CourseService] Leave Course Error:", error);
+      return {
+        data: null,
+        error: { message: error.message || "Failed to leave hub." },
+      };
+    }
+  },
 };

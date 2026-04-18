@@ -136,8 +136,7 @@ export const courseService = {
   },
 
   /**
-   * Toggles the join status for a specific course hub.
-   * Assumes your backend has a route like POST /api/courses/:id/join
+   * Joins a course hub (Auth User)
    */
   joinCourse: async (courseId: string) => {
     try {

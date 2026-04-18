@@ -65,15 +65,24 @@ export default function ExploreScreen() {
     }
 
     setIsJoiningId(hubId);
+
+    // 1. This hits your POST /api/courses/:courseId/join endpoint!
     const { error } = await courseService.joinCourse(hubId);
 
     if (error) {
       Alert.alert("Failed to join", error.message);
     } else {
+      Alert.alert("Success", "You have successfully joined the hub!");
+
+      // 2. Optimistically update the UI so the button changes to "Joined"
       setHubs((prevHubs) =>
         prevHubs.map((hub) =>
           hub.id === hubId
-            ? { ...hub, is_joined: true, members: (hub.member_count || 0) + 1 }
+            ? {
+                ...hub,
+                is_joined: true,
+                member_count: (hub.member_count || 0) + 1, // Fixed from "members" to "member_count"
+              }
             : hub,
         ),
       );

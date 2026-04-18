@@ -15,9 +15,11 @@ import {
   View,
 } from "react-native";
 
+import { useRouter } from "expo-router";
 import { Course, courseService } from "../../src/api/course.service";
 
 export default function ExploreScreen() {
+  const router = useRouter();
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
 
@@ -80,7 +82,12 @@ export default function ExploreScreen() {
   };
 
   const renderHubCard = ({ item }: { item: Course }) => (
-    <View style={styles.card}>
+    // Changed from <View> to <TouchableOpacity>
+    <TouchableOpacity
+      activeOpacity={0.7}
+      style={styles.card}
+      onPress={() => router.push(`/course/${item.id}` as any)} // Routes to your details screen!
+    >
       <View style={styles.cardHeader}>
         {/* Updated to course_code */}
         <Text style={styles.courseCode}>{item.course_code}</Text>
@@ -145,7 +152,7 @@ export default function ExploreScreen() {
           <Text style={styles.joinButtonText}>+ Join Hub</Text>
         )}
       </TouchableOpacity>
-    </View>
+    </TouchableOpacity>
   );
 
   return (

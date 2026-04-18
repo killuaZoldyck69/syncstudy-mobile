@@ -31,6 +31,57 @@ export interface CreateCoursePayload {
   final_week_start?: string | null;
 }
 
+export interface Assessment {
+  id: string;
+  title: string;
+  due_date: string;
+  type: string;
+}
+
+export interface Topic {
+  id: string;
+  title: string;
+  status: "NOT_STARTED" | "READING_DONE" | "COMPLETED";
+  date: string;
+  subtopics: { id: string; title: string; is_completed: boolean }[];
+  drive_link?: string;
+}
+
+export interface CourseDetails {
+  course_info: {
+    id: string;
+    course_code: string;
+    course_name: string;
+    section: string;
+    instructor_name: string;
+    term_offered: string;
+    midterm_week_start: string | null;
+    final_week_start: string | null;
+  };
+  user_context: {
+    role: "ADMIN" | "MODERATOR" | "VIEWER" | "MEMBER";
+    mid_term_progress: number;
+    final_term_progress: number;
+  };
+  community: {
+    total_members: number;
+    member_list: {
+      user_id: string;
+      name: string;
+      image: string;
+      role: string;
+    }[];
+  };
+  assessments: Assessment[];
+  topics: Topic[];
+}
+
+export interface CourseDetailsAPIResponse {
+  success: boolean;
+  message: string;
+  data: CourseDetails;
+}
+
 export const courseService = {
   searchCourses: async (query: string = "") => {
     try {
@@ -86,6 +137,21 @@ export const courseService = {
       return {
         data: null,
         error: { message: error.message || "Failed to join hub." },
+      };
+    }
+  },
+
+  getCourseDetails: async (courseId: string) => {
+    try {
+      const response = await apiClient<CourseDetailsAPIResponse>(
+        `/courses/${courseId}`,
+      );
+      return { data: response.data, error: null };
+    } catch (error: any) {
+      console.error("[CourseService] Get Course Details Error:", error);
+      return {
+        data: null,
+        error: { message: error.message || "Failed to load course details." },
       };
     }
   },

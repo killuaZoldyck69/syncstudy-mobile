@@ -131,7 +131,7 @@ export default function CourseDetailsScreen() {
               setIsLoading(false);
             } else {
               Alert.alert("Success", "You have left the workspace.");
-              router.replace("/");
+              router.replace("/(tabs)/explore");
             }
           },
         },
@@ -480,6 +480,10 @@ export default function CourseDetailsScreen() {
                       styles.dropdownItemText,
                       { color: theme.colors.primary },
                     ]}
+                    onPress={() => {
+                      setIsMenuOpen(false); // If it's inside the dropdown
+                      router.push(`/course/add-lecture/${id}` as any);
+                    }}
                   >
                     Add Lecture
                   </Text>

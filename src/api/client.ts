@@ -20,12 +20,17 @@ export const apiClient = async <T>(
   };
 
   // 2. MOBILE FIX: Inject the Bearer token and Origin Header
+  // client.ts — inside the Platform.OS !== "web" block
   if (Platform.OS !== "web") {
-    // Satisfy backend CSRF checks
     requestHeaders["Origin"] = API_URL.replace("/api", "");
 
     try {
       const token = await SecureStore.getItemAsync("better-auth.session_token");
+      console.log(
+        "🔑 Token found:",
+        token ? `${token.substring(0, 20)}...` : "NULL/EMPTY",
+      );
+
       if (token) {
         requestHeaders["Authorization"] = `Bearer ${token}`;
       }

@@ -17,9 +17,14 @@ import {
 
 import { useRouter } from "expo-router";
 import { Course, courseService } from "../../src/api/course.service";
+import { authClient } from "../../src/lib/auth-client"; // <-- 1. Import authClient
 
 export default function ExploreScreen() {
   const router = useRouter();
+
+  // 2. Extract the active session directly into the UI state
+  const { data: session } = authClient.useSession();
+
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
 
@@ -27,7 +32,7 @@ export default function ExploreScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [isJoiningId, setIsJoiningId] = useState<string | null>(null);
 
-  // 1. DEBOUNCER: Wait 500ms after user stops typing to trigger the search
+  // DEBOUNCER: Wait 500ms after user stops typing to trigger the search
   useEffect(() => {
     const handler = setTimeout(() => {
       setDebouncedQuery(searchQuery);
@@ -36,15 +41,13 @@ export default function ExploreScreen() {
     return () => clearTimeout(handler);
   }, [searchQuery]);
 
-  // 2. FETCHER: Run whenever the debounced query changes
   useEffect(() => {
-    fetchHubs(debouncedQuery);
-  }, [debouncedQuery]);
-
+    if (session?.user) {
+      fetchHubs(debouncedQuery); // This correctly fires when session goes null → populated
+    }
+  }, [debouncedQuery, session]); // ✅ already correct
   const fetchHubs = async (query: string) => {
     setIsLoading(true);
-
-    // 'data' here is now strictly guaranteed to be a pure Course[] array!
     const { data, error } = await courseService.searchCourses(query);
 
     if (error) {

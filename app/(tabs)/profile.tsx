@@ -2,6 +2,7 @@ import { theme } from "@/constants/theme";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
+import * as SecureStore from "expo-secure-store";
 import React, { useEffect } from "react";
 import {
   ActivityIndicator,
@@ -34,13 +35,20 @@ export default function ProfileScreen() {
 
   const handleLogout = async () => {
     try {
+      // 1. Tell the backend to destroy the session
       await authClient.signOut();
+
+      // 2. THE FIX: Manually wipe the token from the phone's SecureStore
+      if (Platform.OS !== "web") {
+        await SecureStore.deleteItemAsync("better-auth.session_token");
+      }
+
+      // 3. Navigate back to login
       router.replace("/(auth)/login");
     } catch (error) {
       Alert.alert("Error", "Failed to log out properly.");
     }
   };
-
   // 3. Remove the old manual redirect if-statement that was here
 
   // Show loading state while checking the session

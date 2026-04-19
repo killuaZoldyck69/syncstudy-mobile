@@ -112,6 +112,14 @@ export interface Topic {
   status?: "NOT_STARTED" | "READING_DONE" | "COMPLETED";
 }
 
+export interface CreateTopicPayload {
+  title: string;
+  term_phase: "MID_TERM" | "FINAL_TERM";
+  lecture_date: string; // ISO String
+  note_drive_link?: string;
+  subTopics: { title: string }[];
+}
+
 export const courseService = {
   searchCourses: async (query: string = "") => {
     try {
@@ -320,6 +328,25 @@ export const courseService = {
       return {
         data: null,
         error: { message: error.message || "Failed to load topics." },
+      };
+    }
+  },
+
+  /**
+   * Adds a new lecture/topic with nested sub-topics (Admin/Moderator).
+   */
+  createCourseTopic: async (courseId: string, payload: CreateTopicPayload) => {
+    try {
+      const response = await apiClient<any>(`/courses/${courseId}/topics`, {
+        method: "POST",
+        data: payload,
+      });
+      return { data: response, error: null };
+    } catch (error: any) {
+      console.error("[CourseService] Create Topic Error:", error);
+      return {
+        data: null,
+        error: { message: error.message || "Failed to add lecture." },
       };
     }
   },

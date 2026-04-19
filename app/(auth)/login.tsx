@@ -3,7 +3,8 @@ import { authClient } from "@/src/lib/auth-client";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
-import React, { useState } from "react";
+import * as SecureStore from "expo-secure-store";
+import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -26,34 +27,44 @@ export default function LoginScreen() {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
+  const { data: session } = authClient.useSession();
+
+  useEffect(() => {
+    const wipeGhostToken = async () => {
+      if (Platform.OS !== "web" && !session) {
+        await SecureStore.deleteItemAsync("better-auth.session_token");
+        console.log("🧹 Wiped stale token (no active session)");
+      }
+    };
+    wipeGhostToken();
+  }, [session]);
+
   const handleLogin = async () => {
-    if (!email || !password) {
-      Alert.alert("Error", "Please fill in all fields.");
+    setIsLoading(true);
+    const { data, error } = await authClient.signIn.email({
+      email: email,
+      password: password,
+    });
+
+    if (error) {
+      Alert.alert("Login Failed", error.message);
+      setIsLoading(false);
       return;
     }
 
-    setIsLoading(true);
-    try {
-      console.log("[Auth] Attempting Login with:", email);
-
-      const { data, error } = await authClient.signIn.email({
-        email,
-        password,
-      });
-
-      if (error) {
-        Alert.alert("Login Failed", error.message || "Invalid credentials.");
-        return;
+    if (data) {
+      // Manually store the token so client.ts can reliably read it
+      if (Platform.OS !== "web" && data.token) {
+        await SecureStore.setItemAsync("better-auth.session_token", data.token);
+        console.log("✅ Token manually saved:", data.token.substring(0, 20));
       }
 
-      console.log("[Auth] Login Success:", data);
-      // No manual token saving needed — @better-auth/expo handles SecureStore automatically
-      router.replace("/(tabs)/profile");
-    } catch (error: any) {
-      Alert.alert("Login Failed", error.message);
-    } finally {
-      setIsLoading(false);
+      setTimeout(() => {
+        router.replace("/(tabs)/profile");
+      }, 500); // Reduced from 2000ms, token is already saved
     }
+
+    setIsLoading(false);
   };
 
   return (

@@ -247,4 +247,51 @@ export const courseService = {
       };
     }
   },
+
+  /**
+   * Updates a member's role (Admin only).
+   */
+  updateMemberRole: async (
+    courseId: string,
+    targetUserId: string,
+    newRole: string,
+  ) => {
+    try {
+      const response = await apiClient<any>(
+        `/courses/${courseId}/members/${targetUserId}/role`,
+        {
+          method: "PATCH", // Matches your Express router
+          data: { role: newRole }, // Send the new role in the request body
+        },
+      );
+      return { data: response, error: null };
+    } catch (error: any) {
+      console.error("[CourseService] Update Role Error:", error);
+      return {
+        data: null,
+        error: { message: error.message || "Failed to update role." },
+      };
+    }
+  },
+
+  /**
+   * Removes a member from the hub (Admin only).
+   */
+  removeCourseMember: async (courseId: string, targetUserId: string) => {
+    try {
+      const response = await apiClient<any>(
+        `/courses/${courseId}/members/${targetUserId}`,
+        {
+          method: "DELETE", // Matches your Express router
+        },
+      );
+      return { data: response, error: null };
+    } catch (error: any) {
+      console.error("[CourseService] Remove Member Error:", error);
+      return {
+        data: null,
+        error: { message: error.message || "Failed to remove member." },
+      };
+    }
+  },
 };

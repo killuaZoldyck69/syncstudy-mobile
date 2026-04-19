@@ -67,19 +67,84 @@ export default function ManageMembersScreen() {
     );
   }, [members, searchQuery]);
 
-  const handleRoleChange = (newRole: string) => {
-    // Here you would fire a PUT /api/courses/:courseId/members/:userId route
-    Alert.alert(
-      "Development Note",
-      `API call to change role to ${newRole} would fire here.`,
-    );
+  const handleRoleChange = async (newRole: string) => {
+    if (!selectedMember || !id) return;
+
+    const targetUserId = selectedMember.user_id;
+    const previousRole = selectedMember.role;
+
+    // 1. Close the modal instantly for a snappy UX
     setSelectedMember(null);
+
+    // 2. Optimistically update the UI so the badge changes immediately
+    setMembers((prevMembers) =>
+      prevMembers.map((m) =>
+        m.user_id === targetUserId
+          ? { ...m, role: newRole as CourseMember["role"] }
+          : m,
+      ),
+    );
+
+    // 3. Fire the backend request
+    const { error } = await courseService.updateMemberRole(
+      id as string,
+      targetUserId,
+      newRole,
+    );
+
+    // 4. If the backend rejects it (e.g., they aren't actually an Admin), revert the UI
+    if (error) {
+      Alert.alert("Update Failed", error.message);
+      setMembers((prevMembers) =>
+        prevMembers.map((m) =>
+          m.user_id === targetUserId ? { ...m, role: previousRole } : m,
+        ),
+      );
+    }
   };
 
   const handleRemoveUser = () => {
-    // Here you would fire a DELETE /api/courses/:courseId/members/:userId route
-    Alert.alert("Development Note", "API call to remove user would fire here.");
+    if (!selectedMember || !id) return;
+
+    const targetUserId = selectedMember.user_id;
+    const targetUserName = selectedMember.name;
+
+    // 1. Close the context menu first so it's not hovering over the alert
     setSelectedMember(null);
+
+    // 2. Show a native confirmation dialog
+    Alert.alert(
+      "Remove Member",
+      `Are you sure you want to remove ${targetUserName} from this workspace?`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Remove",
+          style: "destructive", // Native red text on iOS
+          onPress: async () => {
+            // Save a backup of the current list in case the API fails
+            const previousMembers = [...members];
+
+            // 3. Optimistically remove them from the UI instantly
+            setMembers((prevMembers) =>
+              prevMembers.filter((m) => m.user_id !== targetUserId),
+            );
+
+            // 4. Fire the backend request
+            const { error } = await courseService.removeCourseMember(
+              id as string,
+              targetUserId,
+            );
+
+            // 5. If it fails, show an error and revert the UI
+            if (error) {
+              Alert.alert("Failed to Remove User", error.message);
+              setMembers(previousMembers); // Put them back in the list
+            }
+          },
+        },
+      ],
+    );
   };
 
   const renderMemberCard = ({ item }: { item: CourseMember }) => (

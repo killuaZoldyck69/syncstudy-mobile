@@ -5,6 +5,7 @@ import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Linking,
   Modal,
   Platform,
   Pressable,
@@ -18,64 +19,69 @@ import {
 } from "react-native";
 
 import { theme } from "@/constants/theme";
-import { CourseDetails, courseService } from "../../src/api/course.service";
+import {
+  CourseDetails,
+  Topic,
+  courseService,
+} from "../../src/api/course.service";
 
 export default function CourseDetailsScreen() {
   const { id } = useLocalSearchParams();
   const router = useRouter();
 
   const [course, setCourse] = useState<CourseDetails | null>(null);
+  const [topics, setTopics] = useState<Topic[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<"MID-TERM" | "FINAL-TERM">(
     "MID-TERM",
   );
 
+  // State to track which topic accordion is open
+  const [expandedTopics, setExpandedTopics] = useState<Record<string, boolean>>(
+    {},
+  );
+
   // Dropdown Menu State
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
+  // Define fetchDetails inside useEffect to satisfy the ESLint dependency warning
   useEffect(() => {
-    if (id) fetchDetails(id as string);
-  }, [id]);
+    const fetchDetails = async (courseId: string) => {
+      setIsLoading(true);
 
-  const fetchDetails = async (courseId: string) => {
-    setIsLoading(true);
-    const { data, error } = await courseService.getCourseDetails(courseId);
-    if (error) {
-      Alert.alert("Error", error.message);
-      router.back();
-    } else if (data) {
-      setCourse(data);
+      const [detailsRes, topicsRes] = await Promise.all([
+        courseService.getCourseDetails(courseId),
+        courseService.getCourseTopics(courseId),
+      ]);
+
+      if (detailsRes.error) {
+        Alert.alert("Error", detailsRes.error.message);
+        if (router.canGoBack()) {
+          router.back();
+        } else {
+          router.replace("/");
+        }
+      } else if (detailsRes.data) {
+        setCourse(detailsRes.data);
+      }
+
+      if (topicsRes.data) {
+        setTopics(topicsRes.data);
+      }
+
+      setIsLoading(false);
+    };
+
+    if (id) {
+      fetchDetails(id as string);
     }
-    setIsLoading(false);
-  };
+  }, [id, router]);
 
-  if (isLoading || !course) {
-    return (
-      <SafeAreaView
-        style={[
-          styles.safeArea,
-          { justifyContent: "center", alignItems: "center" },
-        ]}
-      >
-        <ActivityIndicator size="large" color={theme.colors.primary} />
-      </SafeAreaView>
-    );
-  }
-
-  const { course_info, user_context, assessments, topics } = course;
-
-  // RBAC Check for Edit privileges
-  const canEdit =
-    user_context.role === "ADMIN" || user_context.role === "MODERATOR";
-
-  const formatDate = (isoString: string | null) => {
-    if (!isoString) return "TBA";
-    const date = new Date(isoString);
-    return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  const toggleTopic = (topicId: string) => {
+    setExpandedTopics((prev) => ({ ...prev, [topicId]: !prev[topicId] }));
   };
 
   // --- ACTION HANDLERS ---
-
   const handleEditPress = () => {
     setIsMenuOpen(false);
     router.push(`/course/edit/${id}` as any);
@@ -133,6 +139,40 @@ export default function CourseDetailsScreen() {
     );
   };
 
+  if (isLoading || !course) {
+    return (
+      <SafeAreaView
+        style={[
+          styles.safeArea,
+          { justifyContent: "center", alignItems: "center" },
+        ]}
+      >
+        <ActivityIndicator size="large" color={theme.colors.primary} />
+      </SafeAreaView>
+    );
+  }
+
+  const { course_info, user_context, assessments } = course;
+  const canEdit =
+    user_context.role === "ADMIN" || user_context.role === "MODERATOR";
+
+  const formatDate = (isoString: string | null) => {
+    if (!isoString) return "TBA";
+    const date = new Date(isoString);
+    return date.toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
+  };
+
+  // Filter topics dynamically based on the active tab
+  const displayedTopics = topics.filter((t) =>
+    activeTab === "MID-TERM"
+      ? t.term_phase === "MID_TERM"
+      : t.term_phase === "FINAL_TERM",
+  );
+
   return (
     <SafeAreaView style={styles.safeArea}>
       {/* HEADER */}
@@ -156,7 +196,6 @@ export default function CourseDetailsScreen() {
           </View>
         </View>
 
-        {/* Header Right - Ellipsis Icon */}
         <View style={styles.headerRight}>
           <TouchableOpacity
             onPress={() => setIsMenuOpen(true)}
@@ -232,7 +271,7 @@ export default function CourseDetailsScreen() {
           )}
         </View>
 
-        {assessments.length === 0 ? (
+        {!assessments || assessments.length === 0 ? (
           <View style={styles.emptyStateBox}>
             <View style={styles.emptyIconBox}>
               <Ionicons name="calendar-clear" size={24} color="#666" />
@@ -245,7 +284,7 @@ export default function CourseDetailsScreen() {
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{ gap: 12 }}
+            contentContainerStyle={{ gap: 12, marginBottom: 32 }}
           >
             <Text style={{ color: "#fff" }}>Assessments will appear here</Text>
           </ScrollView>
@@ -281,20 +320,118 @@ export default function CourseDetailsScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* LECTURES / TOPICS LIST */}
+        {/* DYNAMIC TOPICS LIST */}
         <View style={styles.topicsContainer}>
-          {topics.length === 0 ? (
+          {displayedTopics.length === 0 ? (
             <Text style={styles.emptyTopicsText}>
               No lectures have been added to this term yet.
             </Text>
           ) : (
-            topics.map((topic, index) => (
-              <View key={topic.id} style={styles.topicCard}>
-                <Text style={styles.topicTitle}>
-                  {index + 1}. {topic.title}
-                </Text>
-              </View>
-            ))
+            displayedTopics.map((topic) => {
+              const isExpanded = !!expandedTopics[topic.id];
+              // Use strict underscore typings to fix the ESLint error
+              const status = topic.status || "NOT_STARTED";
+              const isDone =
+                status === "READING_DONE" || status === "COMPLETED";
+              const displayStatus = status.replace("_", " "); // Changes "READING_DONE" to "READING DONE" for the UI
+
+              return (
+                <View key={topic.id} style={styles.topicCard}>
+                  {/* Topic Header / Accordion Toggle */}
+                  <TouchableOpacity
+                    activeOpacity={0.7}
+                    onPress={() => toggleTopic(topic.id)}
+                    style={styles.topicHeader}
+                  >
+                    <View style={styles.topicHeaderLeft}>
+                      <Text style={styles.topicTitle}>{topic.title}</Text>
+                      <Text style={styles.topicDate}>
+                        {formatDate(topic.lecture_date)}
+                      </Text>
+                    </View>
+
+                    <View style={styles.topicHeaderRight}>
+                      {/* Status Pill */}
+                      <View
+                        style={[
+                          styles.statusBadge,
+                          isDone && styles.statusBadgeDone,
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.statusText,
+                            isDone && styles.statusTextDone,
+                          ]}
+                        >
+                          {displayStatus}
+                        </Text>
+                      </View>
+
+                      {canEdit && (
+                        <>
+                          <TouchableOpacity style={styles.actionIcon}>
+                            <Ionicons name="pencil" size={16} color="#888" />
+                          </TouchableOpacity>
+                          <TouchableOpacity style={styles.actionIcon}>
+                            <Ionicons name="trash" size={16} color="#888" />
+                          </TouchableOpacity>
+                        </>
+                      )}
+
+                      <Ionicons
+                        name={isExpanded ? "chevron-up" : "chevron-down"}
+                        size={20}
+                        color={theme.colors.textSecondary}
+                        style={{ marginLeft: 4 }}
+                      />
+                    </View>
+                  </TouchableOpacity>
+
+                  {/* Expanded Sub-Topics Content */}
+                  {isExpanded && (
+                    <View style={styles.topicContent}>
+                      {topic.subTopics?.map((sub) => (
+                        <TouchableOpacity
+                          key={sub.id}
+                          style={styles.subTopicRow}
+                          activeOpacity={0.7}
+                        >
+                          <Ionicons
+                            name={
+                              sub.is_completed ? "checkbox" : "square-outline"
+                            }
+                            size={24}
+                            color={
+                              sub.is_completed ? theme.colors.primary : "#666"
+                            }
+                          />
+                          <Text style={styles.subTopicText}>{sub.title}</Text>
+                        </TouchableOpacity>
+                      ))}
+
+                      {topic.note_drive_link && (
+                        <TouchableOpacity
+                          style={styles.driveButton}
+                          onPress={() =>
+                            Linking.openURL(topic.note_drive_link as string)
+                          }
+                        >
+                          <Ionicons
+                            name="link"
+                            size={18}
+                            color={theme.colors.textPrimary}
+                          />
+                          <Text style={styles.driveButtonText}>
+                            Open Drive Notes
+                          </Text>
+                        </TouchableOpacity>
+                      )}
+                    </View>
+                  )}
+                </View>
+              );
+            })
           )}
         </View>
       </ScrollView>
@@ -415,6 +552,7 @@ export default function CourseDetailsScreen() {
   );
 }
 
+// 100% COMPLETE MERGED STYLESHEET
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
@@ -422,6 +560,7 @@ const styles = StyleSheet.create({
     paddingTop: Platform.OS === "android" ? RNStatusBar.currentHeight : 0,
   },
 
+  /* Header */
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -447,6 +586,7 @@ const styles = StyleSheet.create({
 
   scrollContent: { paddingHorizontal: theme.spacing.lg, paddingBottom: 40 },
 
+  /* Tags */
   tagsRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 24 },
   tag: {
     backgroundColor: "#1a1a1c",
@@ -462,6 +602,7 @@ const styles = StyleSheet.create({
     color: theme.colors.textSecondary,
   },
 
+  /* Progress Cards */
   progressRow: { flexDirection: "row", gap: 16, marginBottom: 32 },
   progressCard: {
     flex: 1,
@@ -496,6 +637,7 @@ const styles = StyleSheet.create({
     color: theme.colors.textSecondary,
   },
 
+  /* Assessments */
   sectionHeaderRow: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -522,6 +664,7 @@ const styles = StyleSheet.create({
     color: theme.colors.primary,
   },
 
+  /* Empty State */
   emptyStateBox: {
     backgroundColor: "#161618",
     borderRadius: theme.shapes.radius.standard,
@@ -547,6 +690,7 @@ const styles = StyleSheet.create({
     color: theme.colors.textSecondary,
   },
 
+  /* Tabs */
   tabsContainer: {
     flexDirection: "row",
     borderBottomWidth: 1,
@@ -562,6 +706,7 @@ const styles = StyleSheet.create({
   },
   activeTabText: { color: theme.colors.primary },
 
+  /* Topics */
   topicsContainer: { gap: 16 },
   emptyTopicsText: {
     fontFamily: theme.typography.body,
@@ -569,14 +714,81 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginTop: 24,
   },
+
+  /* --- Topic Accordion Styles --- */
   topicCard: {
     backgroundColor: theme.colors.surface,
     borderRadius: theme.shapes.radius.standard,
     padding: 16,
+    marginBottom: 16,
   },
+  topicHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+  },
+  topicHeaderLeft: { flex: 1, paddingRight: 8 },
   topicTitle: {
     fontFamily: theme.typography.bodyBold,
     fontSize: 16,
+    color: theme.colors.textPrimary,
+    lineHeight: 22,
+  },
+  topicDate: {
+    fontFamily: theme.typography.body,
+    fontSize: 12,
+    color: theme.colors.textSecondary,
+    marginTop: 4,
+  },
+
+  topicHeaderRight: { flexDirection: "row", alignItems: "center", gap: 6 },
+  statusBadge: {
+    backgroundColor: "#2a2a2a",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 4,
+  },
+  statusBadgeDone: { backgroundColor: "rgba(157, 120, 245, 0.15)" },
+  statusText: {
+    fontFamily: theme.typography.bodyBold,
+    fontSize: 10,
+    color: "#888",
+    textTransform: "uppercase",
+  },
+  statusTextDone: { color: theme.colors.primary },
+  actionIcon: { padding: 4 },
+
+  topicContent: {
+    marginTop: 16,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: "#2a2a2a",
+  },
+  subTopicRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    marginBottom: 12,
+  },
+  subTopicText: {
+    fontFamily: theme.typography.body,
+    fontSize: 15,
+    color: theme.colors.textPrimary,
+  },
+
+  driveButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    backgroundColor: "#222",
+    paddingVertical: 14,
+    borderRadius: 8,
+    marginTop: 8,
+  },
+  driveButtonText: {
+    fontFamily: theme.typography.bodyBold,
+    fontSize: 14,
     color: theme.colors.textPrimary,
   },
 

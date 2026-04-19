@@ -38,15 +38,6 @@ export interface Assessment {
   type: string;
 }
 
-export interface Topic {
-  id: string;
-  title: string;
-  status: "NOT_STARTED" | "READING_DONE" | "COMPLETED";
-  date: string;
-  subtopics: { id: string; title: string; is_completed: boolean }[];
-  drive_link?: string;
-}
-
 export interface CourseDetails {
   course_info: {
     id: string;
@@ -101,6 +92,24 @@ export interface CourseMember {
   email?: string;
   image: string;
   role: "ADMIN" | "MODERATOR" | "VIEWER" | "MEMBER";
+}
+
+export interface SubTopic {
+  id: string;
+  topic_id: string;
+  title: string;
+  is_completed?: boolean;
+}
+
+export interface Topic {
+  id: string;
+  course_id: string;
+  title: string;
+  term_phase: "MID_TERM" | "FINAL_TERM";
+  lecture_date: string;
+  note_drive_link?: string;
+  subTopics: SubTopic[];
+  status?: "NOT_STARTED" | "READING_DONE" | "COMPLETED";
 }
 
 export const courseService = {
@@ -291,6 +300,26 @@ export const courseService = {
       return {
         data: null,
         error: { message: error.message || "Failed to remove member." },
+      };
+    }
+  },
+
+  /**
+   * Fetches all topics and nested sub-topics for a course.
+   */
+  getCourseTopics: async (courseId: string) => {
+    try {
+      const response = await apiClient<any>(`/courses/${courseId}/topics`);
+      // Defensive mapping: ensures we always return an array, even if the backend returns a single object
+      const topicsData = Array.isArray(response.data)
+        ? response.data
+        : [response.data];
+      return { data: topicsData, error: null };
+    } catch (error: any) {
+      console.error("[CourseService] Get Topics Error:", error);
+      return {
+        data: null,
+        error: { message: error.message || "Failed to load topics." },
       };
     }
   },

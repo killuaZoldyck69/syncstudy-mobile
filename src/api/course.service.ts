@@ -120,6 +120,14 @@ export interface CreateTopicPayload {
   subTopics: { title: string }[];
 }
 
+export interface UpdateTopicPayload {
+  title?: string;
+  term_phase?: "MID_TERM" | "FINAL_TERM";
+  lecture_date?: string;
+  note_drive_link?: string;
+  subTopics?: { id?: string; title: string }[];
+}
+
 export const courseService = {
   searchCourses: async (query: string = "") => {
     try {
@@ -347,6 +355,32 @@ export const courseService = {
       return {
         data: null,
         error: { message: error.message || "Failed to add lecture." },
+      };
+    }
+  },
+
+  /**
+   * Updates an existing lecture/topic metadata (Admin/Moderator).
+   */
+  updateCourseTopic: async (
+    courseId: string,
+    topicId: string,
+    payload: UpdateTopicPayload,
+  ) => {
+    try {
+      const response = await apiClient<any>(
+        `/courses/${courseId}/topics/${topicId}`,
+        {
+          method: "PUT",
+          data: payload,
+        },
+      );
+      return { data: response, error: null };
+    } catch (error: any) {
+      console.error("[CourseService] Update Topic Error:", error);
+      return {
+        data: null,
+        error: { message: error.message || "Failed to update lecture." },
       };
     }
   },

@@ -370,7 +370,14 @@ export default function CourseDetailsScreen() {
 
                       {canEdit && (
                         <>
-                          <TouchableOpacity style={styles.actionIcon}>
+                          <TouchableOpacity
+                            style={styles.actionIcon}
+                            onPress={() =>
+                              router.push(
+                                `/course/edit-lecture/${topic.id}?courseId=${id}` as any,
+                              )
+                            }
+                          >
                             <Ionicons name="pencil" size={16} color="#888" />
                           </TouchableOpacity>
                           <TouchableOpacity style={styles.actionIcon}>

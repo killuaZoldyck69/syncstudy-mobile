@@ -295,7 +295,10 @@ export default function CourseDetailsScreen() {
         <View style={styles.sectionHeaderRow}>
           <Text style={styles.sectionTitle}>Upcoming Assessments</Text>
           {canEdit && (
-            <TouchableOpacity style={styles.smallAddBtn}>
+            <TouchableOpacity
+              style={styles.smallAddBtn}
+              onPress={() => router.push(`/course/add-assessment/${id}` as any)} // <-- Add this navigation!
+            >
               <Ionicons
                 name="add-circle"
                 size={16}

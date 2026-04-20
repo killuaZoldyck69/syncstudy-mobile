@@ -128,6 +128,13 @@ export interface UpdateTopicPayload {
   subTopics?: { id?: string; title: string }[];
 }
 
+export interface CreateAssessmentPayload {
+  title: string;
+  type: string; // Will be sent as "QUIZ" | "ASSIGNMENT" | "PRESENTATION"
+  date_time: string | null; // Changed from due_date
+  is_tba: boolean;
+}
+
 export const courseService = {
   searchCourses: async (query: string = "") => {
     try {
@@ -402,6 +409,31 @@ export const courseService = {
       return {
         data: null,
         error: { message: error.message || "Failed to delete lecture." },
+      };
+    }
+  },
+
+  /**
+   * Schedules a new assessment (Admin / Moderator).
+   */
+  createCourseAssessment: async (
+    courseId: string,
+    payload: CreateAssessmentPayload,
+  ) => {
+    try {
+      const response = await apiClient<any>(
+        `/courses/${courseId}/assessments`,
+        {
+          method: "POST",
+          data: payload,
+        },
+      );
+      return { data: response, error: null };
+    } catch (error: any) {
+      console.error("[CourseService] Create Assessment Error:", error);
+      return {
+        data: null,
+        error: { message: error.message || "Failed to add assessment." },
       };
     }
   },

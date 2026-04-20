@@ -384,4 +384,25 @@ export const courseService = {
       };
     }
   },
+
+  /**
+   * Deletes a lecture/topic and its sub-topics (Admin/Moderator).
+   */
+  deleteCourseTopic: async (courseId: string, topicId: string) => {
+    try {
+      const response = await apiClient<any>(
+        `/courses/${courseId}/topics/${topicId}`,
+        {
+          method: "DELETE", // Matches your Express router
+        },
+      );
+      return { data: response, error: null };
+    } catch (error: any) {
+      console.error("[CourseService] Delete Topic Error:", error);
+      return {
+        data: null,
+        error: { message: error.message || "Failed to delete lecture." },
+      };
+    }
+  },
 };

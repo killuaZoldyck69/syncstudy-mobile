@@ -139,6 +139,41 @@ export default function CourseDetailsScreen() {
     );
   };
 
+  const handleDeleteTopic = (topicId: string, topicTitle: string) => {
+    Alert.alert(
+      "Delete Lecture",
+      `Are you sure you want to delete "${topicTitle}"? This will permanently remove all nested sub-topics.`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive", // Native red text on iOS
+          onPress: async () => {
+            // 1. Save a backup of the current list
+            const previousTopics = [...topics];
+
+            // 2. Optimistically remove it from the UI instantly
+            setTopics((prevTopics) =>
+              prevTopics.filter((t) => t.id !== topicId),
+            );
+
+            // 3. Fire the backend request
+            const { error } = await courseService.deleteCourseTopic(
+              id as string,
+              topicId,
+            );
+
+            // 4. If it fails, show an error and revert the UI
+            if (error) {
+              Alert.alert("Delete Failed", error.message);
+              setTopics(previousTopics); // Put the topic back in the list
+            }
+          },
+        },
+      ],
+    );
+  };
+
   if (isLoading || !course) {
     return (
       <SafeAreaView
@@ -380,7 +415,14 @@ export default function CourseDetailsScreen() {
                           >
                             <Ionicons name="pencil" size={16} color="#888" />
                           </TouchableOpacity>
-                          <TouchableOpacity style={styles.actionIcon}>
+
+                          {/* THE UPDATE: Added onPress to the Trash Icon */}
+                          <TouchableOpacity
+                            style={styles.actionIcon}
+                            onPress={() =>
+                              handleDeleteTopic(topic.id, topic.title)
+                            }
+                          >
                             <Ionicons name="trash" size={16} color="#888" />
                           </TouchableOpacity>
                         </>

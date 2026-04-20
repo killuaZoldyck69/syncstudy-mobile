@@ -136,6 +136,13 @@ export interface Assessment {
   is_tba?: boolean;
 }
 
+export interface UpdateAssessmentPayload {
+  title?: string;
+  type?: string; // Will be sent as "QUIZ" | "ASSIGNMENT" | "PRESENTATION"
+  date_time?: string | null;
+  is_tba?: boolean;
+}
+
 export const courseService = {
   searchCourses: async (query: string = "") => {
     try {
@@ -453,6 +460,53 @@ export const courseService = {
       return {
         data: null,
         error: { message: error.message || "Failed to load assessments." },
+      };
+    }
+  },
+
+  /**
+   * Updates an existing assessment (Admin / Moderator).
+   */
+  updateCourseAssessment: async (
+    courseId: string,
+    assessmentId: string,
+    payload: UpdateAssessmentPayload,
+  ) => {
+    try {
+      const response = await apiClient<any>(
+        `/courses/${courseId}/assessments/${assessmentId}`,
+        {
+          method: "PUT",
+          data: payload,
+        },
+      );
+      return { data: response, error: null };
+    } catch (error: any) {
+      console.error("[CourseService] Update Assessment Error:", error);
+      return {
+        data: null,
+        error: { message: error.message || "Failed to update assessment." },
+      };
+    }
+  },
+
+  /**
+   * Deletes a scheduled assessment (Admin / Moderator).
+   */
+  deleteCourseAssessment: async (courseId: string, assessmentId: string) => {
+    try {
+      const response = await apiClient<any>(
+        `/courses/${courseId}/assessments/${assessmentId}`,
+        {
+          method: "DELETE",
+        },
+      );
+      return { data: response, error: null };
+    } catch (error: any) {
+      console.error("[CourseService] Delete Assessment Error:", error);
+      return {
+        data: null,
+        error: { message: error.message || "Failed to delete assessment." },
       };
     }
   },

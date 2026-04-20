@@ -164,6 +164,44 @@ export default function CourseDetailsScreen() {
     );
   };
 
+  const handleDeleteAssessment = (
+    assessmentId: string,
+    assessmentTitle: string,
+  ) => {
+    Alert.alert(
+      "Delete Assessment",
+      `Are you sure you want to delete "${assessmentTitle}"? This cannot be undone.`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive", // Native red text on iOS
+          onPress: async () => {
+            // 1. Save a backup of the current list
+            const previousAssessments = [...assessmentsList];
+
+            // 2. Optimistically remove it from the UI instantly
+            setAssessmentsList((prevList) =>
+              prevList.filter((a) => a.id !== assessmentId),
+            );
+
+            // 3. Fire the backend request
+            const { error } = await courseService.deleteCourseAssessment(
+              id as string,
+              assessmentId,
+            );
+
+            // 4. If it fails, show an error and revert the UI
+            if (error) {
+              Alert.alert("Delete Failed", error.message);
+              setAssessmentsList(previousAssessments);
+            }
+          },
+        },
+      ],
+    );
+  };
+
   if (isLoading || !course) {
     return (
       <SafeAreaView
@@ -383,10 +421,27 @@ export default function CourseDetailsScreen() {
 
                     {canEdit && (
                       <View style={{ flexDirection: "row", gap: 6 }}>
-                        <TouchableOpacity style={styles.actionIcon}>
+                        <TouchableOpacity
+                          style={styles.actionIcon}
+                          onPress={() =>
+                            router.push(
+                              `/course/edit-assessment/${assessment.id}?courseId=${id}` as any,
+                            )
+                          }
+                        >
                           <Ionicons name="pencil" size={14} color="#888" />
                         </TouchableOpacity>
-                        <TouchableOpacity style={styles.actionIcon}>
+
+                        {/* THE UPDATE: Added onPress to the Trash Icon */}
+                        <TouchableOpacity
+                          style={styles.actionIcon}
+                          onPress={() =>
+                            handleDeleteAssessment(
+                              assessment.id,
+                              assessment.title,
+                            )
+                          }
+                        >
                           <Ionicons name="trash" size={14} color="#888" />
                         </TouchableOpacity>
                       </View>

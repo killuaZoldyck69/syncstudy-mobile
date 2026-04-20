@@ -31,6 +31,7 @@ export default function CourseDetailsScreen() {
 
   const [course, setCourse] = useState<CourseDetails | null>(null);
   const [topics, setTopics] = useState<Topic[]>([]);
+  const [assessmentsList, setAssessmentsList] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<"MID-TERM" | "FINAL-TERM">(
     "MID-TERM",
@@ -44,37 +45,31 @@ export default function CourseDetailsScreen() {
   // Dropdown Menu State
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
-  // Define fetchDetails inside useEffect to satisfy the ESLint dependency warning
   useEffect(() => {
     const fetchDetails = async (courseId: string) => {
       setIsLoading(true);
 
-      const [detailsRes, topicsRes] = await Promise.all([
+      const [detailsRes, topicsRes, assessmentsRes] = await Promise.all([
         courseService.getCourseDetails(courseId),
         courseService.getCourseTopics(courseId),
+        courseService.getCourseAssessments(courseId),
       ]);
 
       if (detailsRes.error) {
         Alert.alert("Error", detailsRes.error.message);
-        if (router.canGoBack()) {
-          router.back();
-        } else {
-          router.replace("/");
-        }
+        if (router.canGoBack()) router.back();
+        else router.replace("/");
       } else if (detailsRes.data) {
         setCourse(detailsRes.data);
       }
 
-      if (topicsRes.data) {
-        setTopics(topicsRes.data);
-      }
+      if (topicsRes.data) setTopics(topicsRes.data);
+      if (assessmentsRes.data) setAssessmentsList(assessmentsRes.data);
 
       setIsLoading(false);
     };
 
-    if (id) {
-      fetchDetails(id as string);
-    }
+    if (id) fetchDetails(id as string);
   }, [id, router]);
 
   const toggleTopic = (topicId: string) => {
@@ -147,26 +142,21 @@ export default function CourseDetailsScreen() {
         { text: "Cancel", style: "cancel" },
         {
           text: "Delete",
-          style: "destructive", // Native red text on iOS
+          style: "destructive",
           onPress: async () => {
-            // 1. Save a backup of the current list
             const previousTopics = [...topics];
-
-            // 2. Optimistically remove it from the UI instantly
             setTopics((prevTopics) =>
               prevTopics.filter((t) => t.id !== topicId),
             );
 
-            // 3. Fire the backend request
             const { error } = await courseService.deleteCourseTopic(
               id as string,
               topicId,
             );
 
-            // 4. If it fails, show an error and revert the UI
             if (error) {
               Alert.alert("Delete Failed", error.message);
-              setTopics(previousTopics); // Put the topic back in the list
+              setTopics(previousTopics);
             }
           },
         },
@@ -187,18 +177,55 @@ export default function CourseDetailsScreen() {
     );
   }
 
-  const { course_info, user_context, assessments } = course;
+  const { course_info, user_context } = course;
   const canEdit =
     user_context.role === "ADMIN" || user_context.role === "MODERATOR";
 
   const formatDate = (isoString: string | null) => {
     if (!isoString) return "TBA";
-    const date = new Date(isoString);
-    return date.toLocaleDateString("en-US", {
+    return new Date(isoString).toLocaleDateString("en-US", {
       month: "short",
       day: "numeric",
       year: "numeric",
     });
+  };
+
+  // --- Assessment Helpers ---
+  const formatAssessmentDate = (dueDate: string | null, isTba: boolean) => {
+    if (isTba || !dueDate) return "To Be Announced";
+    return new Date(dueDate).toLocaleString("en-US", {
+      month: "short",
+      day: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+    });
+  };
+
+  const getDaysLeft = (dueDate: string | null, isTba: boolean) => {
+    if (isTba || !dueDate) return { text: "TBA", color: "#888", bg: "#2a2a2a" };
+
+    const now = new Date();
+    const due = new Date(dueDate);
+    const diffMs = due.getTime() - now.getTime();
+    const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+
+    if (diffDays < 0)
+      return {
+        text: "PAST DUE",
+        color: "#ef4444",
+        bg: "rgba(239, 68, 68, 0.15)",
+      };
+    if (diffDays === 0)
+      return {
+        text: "DUE TODAY",
+        color: "#f59e0b",
+        bg: "rgba(245, 158, 11, 0.15)",
+      };
+    return {
+      text: `${diffDays} DAYS LEFT`,
+      color: "#f59e0b",
+      bg: "rgba(245, 158, 11, 0.15)",
+    };
   };
 
   // Filter topics dynamically based on the active tab
@@ -297,7 +324,7 @@ export default function CourseDetailsScreen() {
           {canEdit && (
             <TouchableOpacity
               style={styles.smallAddBtn}
-              onPress={() => router.push(`/course/add-assessment/${id}` as any)} // <-- Add this navigation!
+              onPress={() => router.push(`/course/add-assessment/${id}` as any)}
             >
               <Ionicons
                 name="add-circle"
@@ -309,7 +336,7 @@ export default function CourseDetailsScreen() {
           )}
         </View>
 
-        {!assessments || assessments.length === 0 ? (
+        {assessmentsList.length === 0 ? (
           <View style={styles.emptyStateBox}>
             <View style={styles.emptyIconBox}>
               <Ionicons name="calendar-clear" size={24} color="#666" />
@@ -322,9 +349,71 @@ export default function CourseDetailsScreen() {
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{ gap: 12, marginBottom: 32 }}
+            contentContainerStyle={{
+              gap: 12,
+              paddingBottom: 32,
+              paddingRight: 20,
+            }}
           >
-            <Text style={{ color: "#fff" }}>Assessments will appear here</Text>
+            {assessmentsList.map((assessment) => {
+              // 1. UPDATE THIS LINE to use date_time
+              const timeStatus = getDaysLeft(
+                assessment.date_time,
+                assessment.is_tba,
+              );
+
+              return (
+                <View key={assessment.id} style={styles.assessmentCard}>
+                  <View style={styles.assessmentCardHeader}>
+                    <View
+                      style={[
+                        styles.daysLeftBadge,
+                        { backgroundColor: timeStatus.bg },
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.daysLeftText,
+                          { color: timeStatus.color },
+                        ]}
+                      >
+                        {timeStatus.text}
+                      </Text>
+                    </View>
+
+                    {canEdit && (
+                      <View style={{ flexDirection: "row", gap: 6 }}>
+                        <TouchableOpacity style={styles.actionIcon}>
+                          <Ionicons name="pencil" size={14} color="#888" />
+                        </TouchableOpacity>
+                        <TouchableOpacity style={styles.actionIcon}>
+                          <Ionicons name="trash" size={14} color="#888" />
+                        </TouchableOpacity>
+                      </View>
+                    )}
+                  </View>
+
+                  <Text style={styles.assessmentTitle} numberOfLines={2}>
+                    {assessment.title}
+                  </Text>
+
+                  <View style={styles.assessmentFooter}>
+                    <Ionicons
+                      name="time-outline"
+                      size={14}
+                      color={theme.colors.textSecondary}
+                    />
+                    <Text style={styles.assessmentDate}>
+                      {/* 2. UPDATE THIS LINE to use date_time */}
+                      {formatAssessmentDate(
+                        assessment.date_time,
+                        assessment.is_tba,
+                      )}
+                    </Text>
+                  </View>
+                </View>
+              );
+            })}
           </ScrollView>
         )}
 
@@ -367,11 +456,10 @@ export default function CourseDetailsScreen() {
           ) : (
             displayedTopics.map((topic) => {
               const isExpanded = !!expandedTopics[topic.id];
-              // Use strict underscore typings to fix the ESLint error
               const status = topic.status || "NOT_STARTED";
               const isDone =
                 status === "READING_DONE" || status === "COMPLETED";
-              const displayStatus = status.replace("_", " "); // Changes "READING_DONE" to "READING DONE" for the UI
+              const displayStatus = status.replace("_", " ");
 
               return (
                 <View key={topic.id} style={styles.topicCard}>
@@ -419,7 +507,6 @@ export default function CourseDetailsScreen() {
                             <Ionicons name="pencil" size={16} color="#888" />
                           </TouchableOpacity>
 
-                          {/* THE UPDATE: Added onPress to the Trash Icon */}
                           <TouchableOpacity
                             style={styles.actionIcon}
                             onPress={() =>
@@ -520,7 +607,10 @@ export default function CourseDetailsScreen() {
               <>
                 <TouchableOpacity
                   style={styles.dropdownItem}
-                  onPress={() => setIsMenuOpen(false)}
+                  onPress={() => {
+                    setIsMenuOpen(false);
+                    router.push(`/course/add-lecture/${id}` as any);
+                  }}
                 >
                   <Ionicons
                     name="add-circle"
@@ -532,10 +622,6 @@ export default function CourseDetailsScreen() {
                       styles.dropdownItemText,
                       { color: theme.colors.primary },
                     ]}
-                    onPress={() => {
-                      setIsMenuOpen(false); // If it's inside the dropdown
-                      router.push(`/course/add-lecture/${id}` as any);
-                    }}
                   >
                     Add Lecture
                   </Text>
@@ -608,7 +694,6 @@ export default function CourseDetailsScreen() {
   );
 }
 
-// 100% COMPLETE MERGED STYLESHEET
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
@@ -693,7 +778,7 @@ const styles = StyleSheet.create({
     color: theme.colors.textSecondary,
   },
 
-  /* Assessments */
+  /* Assessments Section Header */
   sectionHeaderRow: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -718,6 +803,37 @@ const styles = StyleSheet.create({
     fontFamily: theme.typography.bodyBold,
     fontSize: 12,
     color: theme.colors.primary,
+  },
+
+  /* Assessment Cards */
+  assessmentCard: {
+    width: 240,
+    backgroundColor: theme.colors.surface,
+    borderRadius: theme.shapes.radius.standard,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: "#2a2a2a",
+  },
+  assessmentCardHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    marginBottom: 12,
+  },
+  daysLeftBadge: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 4 },
+  daysLeftText: { fontFamily: theme.typography.bodyBold, fontSize: 10 },
+  assessmentTitle: {
+    fontFamily: theme.typography.bodyBold,
+    fontSize: 16,
+    color: theme.colors.textPrimary,
+    marginBottom: 12,
+    height: 44, // Forces uniform card height
+  },
+  assessmentFooter: { flexDirection: "row", alignItems: "center", gap: 6 },
+  assessmentDate: {
+    fontFamily: theme.typography.body,
+    fontSize: 12,
+    color: theme.colors.textSecondary,
   },
 
   /* Empty State */
@@ -770,8 +886,6 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginTop: 24,
   },
-
-  /* --- Topic Accordion Styles --- */
   topicCard: {
     backgroundColor: theme.colors.surface,
     borderRadius: theme.shapes.radius.standard,
@@ -796,7 +910,6 @@ const styles = StyleSheet.create({
     color: theme.colors.textSecondary,
     marginTop: 4,
   },
-
   topicHeaderRight: { flexDirection: "row", alignItems: "center", gap: 6 },
   statusBadge: {
     backgroundColor: "#2a2a2a",
@@ -831,7 +944,6 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: theme.colors.textPrimary,
   },
-
   driveButton: {
     flexDirection: "row",
     alignItems: "center",
@@ -848,7 +960,7 @@ const styles = StyleSheet.create({
     color: theme.colors.textPrimary,
   },
 
-  /* --- Dropdown Menu Styles --- */
+  /* Dropdown Menu Overlay */
   modalOverlay: { flex: 1, backgroundColor: "transparent" },
   dropdownMenu: {
     position: "absolute",

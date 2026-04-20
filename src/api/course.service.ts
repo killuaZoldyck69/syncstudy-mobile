@@ -31,13 +31,6 @@ export interface CreateCoursePayload {
   final_week_start?: string | null;
 }
 
-export interface Assessment {
-  id: string;
-  title: string;
-  due_date: string;
-  type: string;
-}
-
 export interface CourseDetails {
   course_info: {
     id: string;
@@ -133,6 +126,14 @@ export interface CreateAssessmentPayload {
   type: string; // Will be sent as "QUIZ" | "ASSIGNMENT" | "PRESENTATION"
   date_time: string | null; // Changed from due_date
   is_tba: boolean;
+}
+
+export interface Assessment {
+  id: string;
+  title: string;
+  type: string;
+  date_time: string | null;
+  is_tba?: boolean;
 }
 
 export const courseService = {
@@ -434,6 +435,24 @@ export const courseService = {
       return {
         data: null,
         error: { message: error.message || "Failed to add assessment." },
+      };
+    }
+  },
+
+  /**
+   * Fetches upcoming and TBA assessments (Course Member).
+   */
+  getCourseAssessments: async (courseId: string) => {
+    try {
+      const response = await apiClient<any>(`/courses/${courseId}/assessments`);
+      // Defensive mapping to ensure it's always an array
+      const assessmentsData = Array.isArray(response.data) ? response.data : [];
+      return { data: assessmentsData, error: null };
+    } catch (error: any) {
+      console.error("[CourseService] Get Assessments Error:", error);
+      return {
+        data: null,
+        error: { message: error.message || "Failed to load assessments." },
       };
     }
   },

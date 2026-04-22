@@ -202,6 +202,45 @@ export default function CourseDetailsScreen() {
     );
   };
 
+  const handleToggleSubTopic = async (
+    topicId: string,
+    subTopicId: string,
+    currentStatus: boolean,
+  ) => {
+    // Determine what the new status SHOULD be
+    const newStatus = !currentStatus;
+
+    // 1. Save a backup of the current topics list in case the API fails
+    const previousTopics = [...topics];
+
+    // 2. Optimistically update the UI instantly
+    setTopics((prevTopics) =>
+      prevTopics.map((topic) => {
+        if (topic.id === topicId) {
+          return {
+            ...topic,
+            subTopics: topic.subTopics.map((sub) =>
+              sub.id === subTopicId ? { ...sub, is_completed: newStatus } : sub,
+            ),
+          };
+        }
+        return topic;
+      }),
+    );
+
+    // 3. THE FIX: Fire the backend request AND pass the new status payload!
+    const { error } = await courseService.toggleSubTopicProgress(
+      id as string,
+      subTopicId,
+      newStatus,
+    );
+
+    // 4. If it fails, show an error and revert the UI to its previous state
+    if (error) {
+      Alert.alert("Failed to Update Progress", error.message);
+      setTopics(previousTopics);
+    }
+  };
   if (isLoading || !course) {
     return (
       <SafeAreaView
@@ -590,6 +629,13 @@ export default function CourseDetailsScreen() {
                           key={sub.id}
                           style={styles.subTopicRow}
                           activeOpacity={0.7}
+                          onPress={() =>
+                            handleToggleSubTopic(
+                              topic.id,
+                              sub.id,
+                              !!sub.is_completed,
+                            )
+                          }
                         >
                           <Ionicons
                             name={

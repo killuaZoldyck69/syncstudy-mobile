@@ -510,4 +510,31 @@ export const courseService = {
       };
     }
   },
+
+  /**
+   * Toggles the completion status of a sub-topic (Course Member).
+   */
+  toggleSubTopicProgress: async (
+    courseId: string,
+    subTopicId: string,
+    isCompleted: boolean,
+  ) => {
+    try {
+      const response = await apiClient<any>(
+        `/courses/${courseId}/subtopics/${subTopicId}/toggle`,
+        {
+          method: "PUT",
+          // THE FIX: We are now sending the exact JSON body your backend expects!
+          data: { is_completed: isCompleted },
+        },
+      );
+      return { data: response, error: null };
+    } catch (error: any) {
+      console.error("[CourseService] Toggle Sub-Topic Error:", error);
+      return {
+        data: null,
+        error: { message: error.message || "Failed to update progress." },
+      };
+    }
+  },
 };

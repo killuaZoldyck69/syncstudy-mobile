@@ -143,6 +143,35 @@ export interface UpdateAssessmentPayload {
   is_tba?: boolean;
 }
 
+export interface ProgressStats {
+  total_sub_topics: number;
+  completed_sub_topics: number;
+  completion_percentage: number;
+}
+
+export interface DashboardAssessment {
+  title: string;
+  date_time: string;
+}
+
+export interface DashboardHub {
+  id: string;
+  course_code: string;
+  title: string;
+  section: string;
+  instructor: string;
+  is_archived: boolean;
+  my_role: "ADMIN" | "MODERATOR" | "VIEWER" | "MEMBER";
+  member_count: number;
+  next_assessment: DashboardAssessment | null;
+  completion_percentage: number;
+}
+
+export interface MyHubsAPIResponse {
+  active: DashboardHub[];
+  archived: DashboardHub[];
+}
+
 export const courseService = {
   searchCourses: async (query: string = "") => {
     try {
@@ -534,6 +563,40 @@ export const courseService = {
       return {
         data: null,
         error: { message: error.message || "Failed to update progress." },
+      };
+    }
+  },
+
+  /**
+   * Retrieves overall completion statistics for a course.
+   */
+  getCourseProgressStats: async (courseId: string) => {
+    try {
+      const response = await apiClient<any>(
+        `/courses/${courseId}/progress-stats`,
+      );
+      return { data: response.data, error: null };
+    } catch (error: any) {
+      console.error("[CourseService] Get Progress Stats Error:", error);
+      return {
+        data: null,
+        error: { message: error.message || "Failed to load progress stats." },
+      };
+    }
+  },
+
+  /**
+   * Retrieves all hubs joined by the current user, separated by active and archived.
+   */
+  getMyUserHubs: async () => {
+    try {
+      const response = await apiClient<any>("/courses/my-hubs");
+      return { data: response.data as MyHubsAPIResponse, error: null };
+    } catch (error: any) {
+      console.error("[CourseService] Get My Hubs Error:", error);
+      return {
+        data: null,
+        error: { message: error.message || "Failed to load hubs." },
       };
     }
   },

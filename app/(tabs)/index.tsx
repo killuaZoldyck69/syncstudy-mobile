@@ -2,9 +2,11 @@
 import { theme } from "@/constants/theme";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
-import { useRouter } from "expo-router";
-import React, { useState } from "react";
+import { useFocusEffect, useRouter } from "expo-router"; // <-- Added useFocusEffect
+import React, { useCallback, useState } from "react"; // <-- Added useCallback, removed useEffect
 import {
+  ActivityIndicator,
+  Alert,
   Image,
   Modal,
   Platform,
@@ -17,9 +19,10 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { DashboardHub, courseService } from "../../src/api/course.service";
 import { authClient } from "../../src/lib/auth-client";
 
-// --- MOCK DATA ---
+// --- MOCK NOTIFICATIONS ---
 const NOTIFICATIONS = [
   {
     id: "1",
@@ -44,39 +47,173 @@ const NOTIFICATIONS = [
   },
 ];
 
-const ACTIVE_HUBS = [
-  {
-    id: "1",
-    code: "CSE 4131",
-    name: "Mobile App Development",
-    section: "A",
-    role: "LEADER",
-    progress: 75,
-    assessment: { title: "Mid-Term Quiz starts in 2 days.", isUrgent: true },
-  },
-  {
-    id: "2",
-    code: "CSE 3211",
-    name: "Database Systems",
-    section: "C",
-    instructor: "Dr. Khan",
-    members: 112,
-    role: "VIEWER",
-    progress: 20,
-    assessment: null,
-  },
-];
+// --- DEDICATED HUB CARD COMPONENT ---
+function HubCard({ hub }: { hub: DashboardHub }) {
+  const router = useRouter();
+  const [stats, setStats] = useState<any>(null);
+
+  // THE FIX: useFocusEffect triggers every time the screen comes into view
+  useFocusEffect(
+    useCallback(() => {
+      if (hub.id.length > 10) {
+        courseService.getCourseProgressStats(hub.id).then((res) => {
+          if (res.data) setStats(res.data);
+        });
+      }
+    }, [hub.id]),
+  );
+
+  let isUrgent = false;
+  let assessmentDisplayDate = "";
+  if (hub.next_assessment?.date_time) {
+    const due = new Date(hub.next_assessment.date_time);
+    const now = new Date();
+    const diffDays = (due.getTime() - now.getTime()) / (1000 * 60 * 60 * 24);
+    isUrgent = diffDays >= 0 && diffDays <= 3;
+
+    assessmentDisplayDate = due.toLocaleString("en-US", {
+      month: "short",
+      day: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+    });
+  }
+
+  const progress = stats
+    ? stats.completion_percentage
+    : hub.completion_percentage;
+
+  return (
+    <TouchableOpacity
+      activeOpacity={0.8}
+      style={styles.card}
+      onPress={() => router.push(`/course/${hub.id}` as any)}
+    >
+      <View style={styles.cardHeader}>
+        <Text style={styles.courseCode}>{hub.course_code}</Text>
+        <View
+          style={[
+            styles.roleBadge,
+            hub.my_role === "VIEWER" && styles.roleBadgeViewer,
+          ]}
+        >
+          <Text style={styles.roleText}>{hub.my_role}</Text>
+        </View>
+      </View>
+
+      <Text style={styles.courseName}>{hub.title}</Text>
+
+      <View style={styles.metadataRow}>
+        <Text style={styles.metadataText}>Section {hub.section}</Text>
+        {hub.instructor && (
+          <>
+            <View style={styles.dot} />
+            <Text style={styles.metadataText}>{hub.instructor}</Text>
+          </>
+        )}
+        <View style={styles.dot} />
+        <View style={styles.membersWrapper}>
+          <Ionicons name="people" size={14} color={theme.colors.primary} />
+          <Text style={styles.metadataText}>{hub.member_count} Members</Text>
+        </View>
+      </View>
+
+      <View style={styles.assessmentRow}>
+        {hub.next_assessment ? (
+          <>
+            <View style={[styles.iconBox, isUrgent && styles.iconBoxUrgent]}>
+              <Ionicons
+                name="time"
+                size={16}
+                color={isUrgent ? "#EAB308" : theme.colors.textSecondary}
+              />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.assessmentText} numberOfLines={1}>
+                {hub.next_assessment.title}
+              </Text>
+              <Text style={styles.assessmentDateText}>
+                {assessmentDisplayDate}
+              </Text>
+            </View>
+          </>
+        ) : (
+          <>
+            <Ionicons
+              name="calendar-outline"
+              size={16}
+              color={theme.colors.textSecondary}
+              style={{ marginRight: 8 }}
+            />
+            <Text style={styles.assessmentText}>No upcoming assessments</Text>
+          </>
+        )}
+      </View>
+
+      {/* DYNAMIC PROGRESS BAR */}
+      <View style={styles.progressContainer}>
+        <View style={styles.progressTextRow}>
+          <Text style={styles.progressLabel}>Course Completion</Text>
+          <Text style={styles.progressValue}>{progress}%</Text>
+        </View>
+
+        <View style={styles.progressTrack}>
+          <LinearGradient
+            colors={[theme.colors.primary, theme.colors.primaryGradientEnd]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={[styles.progressFill, { width: `${progress}%` }]}
+          />
+        </View>
+
+        {stats && (
+          <Text style={styles.progressSubtitle}>
+            {stats.completed_sub_topics} of {stats.total_sub_topics} sub-topics
+            completed
+          </Text>
+        )}
+      </View>
+    </TouchableOpacity>
+  );
+}
 
 export default function HomeScreen() {
   const router = useRouter();
   const { data: session } = authClient.useSession();
   const user = session?.user as any;
 
+  const [activeHubs, setActiveHubs] = useState<DashboardHub[]>([]);
+  const [archivedHubs, setArchivedHubs] = useState<DashboardHub[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
   const [showNotifications, setShowNotifications] = useState(false);
   const [isArchivedExpanded, setIsArchivedExpanded] = useState(false);
 
-  // Safely get the first name for the greeting
   const firstName = user?.name ? user.name.split(" ")[0] : "Scholar";
+
+  // THE FIX: useFocusEffect silently refetches the list when returning to the tab
+  useFocusEffect(
+    useCallback(() => {
+      const fetchMyHubs = async () => {
+        // Only show the big loading spinner if we have NO data yet
+        if (activeHubs.length === 0 && archivedHubs.length === 0) {
+          setIsLoading(true);
+        }
+
+        const { data, error } = await courseService.getMyUserHubs();
+
+        if (error) {
+          Alert.alert("Error", error.message);
+        } else if (data) {
+          setActiveHubs(data.active);
+          setArchivedHubs(data.archived);
+        }
+        setIsLoading(false);
+      };
+
+      fetchMyHubs();
+    }, [activeHubs.length, archivedHubs.length]),
+  );
 
   const renderNotification = (notif: (typeof NOTIFICATIONS)[0]) => (
     <View key={notif.id} style={styles.notificationItem}>
@@ -98,98 +235,8 @@ export default function HomeScreen() {
     </View>
   );
 
-  const renderHubCard = (hub: (typeof ACTIVE_HUBS)[0]) => (
-    <View key={hub.id} style={styles.card}>
-      {/* Header Row */}
-      <View style={styles.cardHeader}>
-        <Text style={styles.courseCode}>{hub.code}</Text>
-        <View
-          style={[
-            styles.roleBadge,
-            hub.role === "VIEWER" && styles.roleBadgeViewer,
-          ]}
-        >
-          <Text style={styles.roleText}>{hub.role}</Text>
-        </View>
-      </View>
-
-      <Text style={styles.courseName}>{hub.name}</Text>
-
-      {/* Metadata */}
-      <View style={styles.metadataRow}>
-        <Text style={styles.metadataText}>Section {hub.section}</Text>
-        {hub.instructor && (
-          <>
-            <View style={styles.dot} />
-            <Text style={styles.metadataText}>{hub.instructor}</Text>
-          </>
-        )}
-        {hub.members && (
-          <>
-            <View style={styles.dot} />
-            <View style={styles.membersWrapper}>
-              <Ionicons name="people" size={14} color={theme.colors.primary} />
-              <Text style={styles.metadataText}>{hub.members} Members</Text>
-            </View>
-          </>
-        )}
-      </View>
-
-      {/* Assessment Alert */}
-      <View style={styles.assessmentRow}>
-        {hub.assessment ? (
-          <>
-            <View
-              style={[
-                styles.iconBox,
-                hub.assessment.isUrgent && styles.iconBoxUrgent,
-              ]}
-            >
-              <Ionicons
-                name="time"
-                size={16}
-                color={
-                  hub.assessment.isUrgent
-                    ? "#EAB308"
-                    : theme.colors.textSecondary
-                }
-              />
-            </View>
-            <Text style={styles.assessmentText}>{hub.assessment.title}</Text>
-          </>
-        ) : (
-          <>
-            <Ionicons
-              name="calendar-outline"
-              size={16}
-              color={theme.colors.textSecondary}
-              style={{ marginRight: 8 }}
-            />
-            <Text style={styles.assessmentText}>No upcoming assessments</Text>
-          </>
-        )}
-      </View>
-
-      {/* Progress Bar */}
-      <View style={styles.progressContainer}>
-        <Text style={styles.progressLabel}>
-          Mid-Term Progress: {hub.progress}%
-        </Text>
-        <View style={styles.progressTrack}>
-          <LinearGradient
-            colors={[theme.colors.primary, theme.colors.primaryGradientEnd]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={[styles.progressFill, { width: `${hub.progress}%` }]}
-          />
-        </View>
-      </View>
-    </View>
-  );
-
   return (
     <SafeAreaView style={styles.safeArea}>
-      {/* HEADER */}
       <View style={styles.header}>
         <View style={styles.userInfo}>
           <Image
@@ -211,7 +258,6 @@ export default function HomeScreen() {
             size={24}
             color={theme.colors.textPrimary}
           />
-          {/* Unread Badge */}
           <View style={styles.badge} />
         </TouchableOpacity>
       </View>
@@ -220,12 +266,11 @@ export default function HomeScreen() {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* ---> ADD THIS NEW BANNER HERE <--- */}
         <View style={styles.createHubBanner}>
           <Text style={styles.createHubText}>Lead a study group?</Text>
           <TouchableOpacity
             activeOpacity={0.8}
-            onPress={() => router.push("/create-hub")} // We will build this route next!
+            onPress={() => router.push("/create-hub")}
           >
             <LinearGradient
               colors={[theme.colors.primary, theme.colors.primaryGradientEnd]}
@@ -237,45 +282,76 @@ export default function HomeScreen() {
             </LinearGradient>
           </TouchableOpacity>
         </View>
-      </ScrollView>
 
-      <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* ACTIVE HUBS SECTION */}
         <Text style={styles.sectionEyebrow}>ACTIVE HUBS</Text>
-        <View style={styles.hubsContainer}>
-          {ACTIVE_HUBS.map(renderHubCard)}
-        </View>
+
+        {isLoading ? (
+          <ActivityIndicator
+            size="large"
+            color={theme.colors.primary}
+            style={{ marginVertical: 40 }}
+          />
+        ) : activeHubs.length === 0 ? (
+          <View style={styles.emptyStateBox}>
+            <Ionicons
+              name="library-outline"
+              size={32}
+              color="#666"
+              style={{ marginBottom: 12 }}
+            />
+            <Text style={styles.emptyStateText}>
+              You haven&apos;t joined any hubs yet.
+            </Text>
+            <TouchableOpacity onPress={() => router.push("/(tabs)/explore")}>
+              <Text style={styles.emptyStateLink}>Explore Hubs</Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <View style={styles.hubsContainer}>
+            {activeHubs.map((hub) => (
+              <HubCard key={hub.id} hub={hub} />
+            ))}
+          </View>
+        )}
 
         {/* ARCHIVED HUBS ACCORDION */}
-        <TouchableOpacity
-          style={styles.archivedHeader}
-          activeOpacity={0.7}
-          onPress={() => setIsArchivedExpanded(!isArchivedExpanded)}
-        >
-          <Text style={styles.archivedText}>Archived Hubs (1)</Text>
-          <Ionicons
-            name={isArchivedExpanded ? "chevron-up" : "chevron-down"}
-            size={20}
-            color={theme.colors.textPrimary}
-          />
-        </TouchableOpacity>
+        {!isLoading && (
+          <>
+            <TouchableOpacity
+              style={styles.archivedHeader}
+              activeOpacity={0.7}
+              onPress={() => setIsArchivedExpanded(!isArchivedExpanded)}
+            >
+              <Text style={styles.archivedText}>
+                Archived Hubs ({archivedHubs.length})
+              </Text>
+              <Ionicons
+                name={isArchivedExpanded ? "chevron-up" : "chevron-down"}
+                size={20}
+                color={theme.colors.textPrimary}
+              />
+            </TouchableOpacity>
 
-        {isArchivedExpanded && (
-          <Text
-            style={[
-              styles.metadataText,
-              { marginTop: 12, textAlign: "center" },
-            ]}
-          >
-            Archived hubs will appear here.
-          </Text>
+            {isArchivedExpanded && (
+              <View style={[styles.hubsContainer, { marginTop: 16 }]}>
+                {archivedHubs.length === 0 ? (
+                  <Text
+                    style={[
+                      styles.metadataText,
+                      { textAlign: "center", marginVertical: 12 },
+                    ]}
+                  >
+                    No archived hubs.
+                  </Text>
+                ) : (
+                  archivedHubs.map((hub) => <HubCard key={hub.id} hub={hub} />)
+                )}
+              </View>
+            )}
+          </>
         )}
       </ScrollView>
 
-      {/* NOTIFICATIONS MODAL OVERLAY */}
       <Modal
         visible={showNotifications}
         transparent={true}
@@ -290,9 +366,7 @@ export default function HomeScreen() {
               <Text style={styles.notificationTitle}>Notifications</Text>
               <Text style={styles.notificationNewText}>2 NEW</Text>
             </View>
-
             {NOTIFICATIONS.map(renderNotification)}
-
             <TouchableOpacity
               style={styles.clearAllBtn}
               onPress={() => setShowNotifications(false)}
@@ -312,8 +386,6 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.background,
     paddingTop: Platform.OS === "android" ? RNStatusBar.currentHeight : 0,
   },
-
-  /* Header */
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -350,7 +422,6 @@ const styles = StyleSheet.create({
 
   scrollContent: { paddingHorizontal: theme.spacing.lg, paddingBottom: 40 },
 
-  /* Section Headers */
   sectionEyebrow: {
     fontFamily: theme.typography.bodyBold,
     fontSize: 12,
@@ -361,11 +432,12 @@ const styles = StyleSheet.create({
   },
   hubsContainer: { gap: theme.spacing.lg, marginBottom: theme.spacing.xl },
 
-  /* Cards */
   card: {
     backgroundColor: theme.colors.surface,
     borderRadius: theme.shapes.radius.standard,
     padding: theme.spacing.lg,
+    borderWidth: 1,
+    borderColor: "#2a2a2a",
   },
   cardHeader: {
     flexDirection: "row",
@@ -435,29 +507,71 @@ const styles = StyleSheet.create({
   },
   iconBoxUrgent: { backgroundColor: "rgba(234, 179, 8, 0.15)" },
   assessmentText: {
-    fontFamily: theme.typography.body,
+    fontFamily: theme.typography.bodyBold,
     fontSize: 14,
     color: theme.colors.textPrimary,
-    flex: 1,
+  },
+  assessmentDateText: {
+    fontFamily: theme.typography.body,
+    fontSize: 12,
+    color: theme.colors.textSecondary,
+    marginTop: 2,
   },
 
-  /* Progress Bar */
   progressContainer: { marginTop: 4 },
+  progressTextRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 8,
+  },
   progressLabel: {
     fontFamily: theme.typography.bodyBold,
     fontSize: 12,
     color: theme.colors.textPrimary,
-    marginBottom: 8,
+  },
+  progressValue: {
+    fontFamily: theme.typography.bodyBold,
+    fontSize: 12,
+    color: theme.colors.primary,
   },
   progressTrack: {
     height: 6,
     backgroundColor: "#2a2a2a",
     borderRadius: 3,
     overflow: "hidden",
+    marginBottom: 8,
   },
   progressFill: { height: "100%", borderRadius: 3 },
+  progressSubtitle: {
+    fontFamily: theme.typography.body,
+    fontSize: 11,
+    color: theme.colors.textSecondary,
+  },
 
-  /* Archived Hubs */
+  emptyStateBox: {
+    backgroundColor: "#1a1a1c",
+    padding: 32,
+    borderRadius: 16,
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#2a2a2a",
+    borderStyle: "dashed",
+    marginBottom: 24,
+  },
+  emptyStateText: {
+    fontFamily: theme.typography.body,
+    fontSize: 15,
+    color: theme.colors.textSecondary,
+    textAlign: "center",
+    marginBottom: 12,
+  },
+  emptyStateLink: {
+    fontFamily: theme.typography.bodyBold,
+    fontSize: 15,
+    color: theme.colors.primary,
+  },
+
   archivedHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -465,6 +579,8 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.surface,
     padding: theme.spacing.lg,
     borderRadius: theme.shapes.radius.standard,
+    borderWidth: 1,
+    borderColor: "#2a2a2a",
   },
   archivedText: {
     fontFamily: theme.typography.heading,
@@ -472,7 +588,6 @@ const styles = StyleSheet.create({
     color: theme.colors.textPrimary,
   },
 
-  /* Notifications Modal */
   modalOverlay: {
     flex: 1,
     backgroundColor: "rgba(0, 0, 0, 0.6)",
@@ -511,7 +626,6 @@ const styles = StyleSheet.create({
     color: theme.colors.primary,
     letterSpacing: 1,
   },
-
   notificationItem: {
     flexDirection: "row",
     alignItems: "flex-start",
@@ -544,7 +658,6 @@ const styles = StyleSheet.create({
     color: theme.colors.textSecondary,
     marginTop: 4,
   },
-
   clearAllBtn: {
     marginTop: theme.spacing.md,
     paddingVertical: theme.spacing.sm,
@@ -557,7 +670,6 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
   },
 
-  /* Create Hub Banner */
   createHubBanner: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -566,17 +678,19 @@ const styles = StyleSheet.create({
     borderRadius: theme.shapes.radius.standard,
     padding: theme.spacing.lg,
     marginBottom: theme.spacing.xl,
-    marginTop: theme.spacing.sm, // Adds a little breathing room from the header
+    marginTop: theme.spacing.sm,
+    borderWidth: 1,
+    borderColor: "#2a2a2a",
   },
   createHubText: {
-    fontFamily: theme.typography.body, // or theme.typography.heading if you want it bolder
+    fontFamily: theme.typography.body,
     fontSize: 16,
     color: theme.colors.textPrimary,
   },
   createHubBtn: {
     paddingVertical: 10,
     paddingHorizontal: 16,
-    borderRadius: theme.shapes.radius.standard, // Matches the slight rounding in your mockup
+    borderRadius: theme.shapes.radius.standard,
   },
   createHubBtnText: {
     fontFamily: theme.typography.bodyBold,
